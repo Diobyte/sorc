@@ -21,6 +21,7 @@ orbwalker.set_clear_toggle(true);
 local my_target_selector = require("my_utility/my_target_selector");
 local my_utility = require("my_utility/my_utility");
 local spell_data = require("my_utility/spell_data");
+local buff_cache = require("my_utility/buff_cache");
 local get_spell_priority = require("spell_priority");
 local logger = require("my_utility/logger");
 

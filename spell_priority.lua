@@ -15,6 +15,9 @@
 -- Levels 35-45: Build specialization
 -- Level 45+: End-game build priorities
 
+-- Forward declaration
+local get_spell_priority
+
 -- Function to get base spell priority (without item adjustments)
 local function get_base_spell_priority(build_index)
     if build_index == 1 then  -- Ball Lightning Build (Season 11 META)
@@ -230,4 +233,4 @@ local function get_spell_priority(build_index, character_level)
     return adjust_priorities_for_items(base_priorities)
 end
 
-return get_spell_priority 
+return get_spell_priority
