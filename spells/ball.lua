@@ -15,7 +15,7 @@ local function menu()
     
     if menu_elements.tree_tab:push("Ball")then
         menu_elements.main_boolean:render("Enable Spell", "")
-        menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes, "")
+        menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged, "")
         menu_elements.min_target_range:render("Min Target Range", "", 1)
  
         menu_elements.tree_tab:pop()
@@ -39,7 +39,7 @@ local function logics(target)
         return false;
     end;
 
-    if cast_spell.target(target, spell_data.ball.spell_id, false) then
+    if cast_spell.target(target, spell_data.ball.spell_id, 0) then
 
         local current_time = get_time_since_inject();
         local cooldown = my_utility.spell_delays.regular_cast;

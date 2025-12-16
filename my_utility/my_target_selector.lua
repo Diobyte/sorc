@@ -529,6 +529,10 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
         end
         
         -- Calculate base weights for each target (without nearby bonus)
+        -- Weight calculation considers:
+        -- 1. Base weight by enemy type (boss > champion > elite > normal)
+        -- 2. Buff modifications (damage resistance provider/receiver, vulnerable debuff)
+        -- 3. Horde objectives (special infernal horde targets)
         local weighted_targets = {}
         for _, unit in ipairs(cached_target_list) do
             local base_weight = any_weight
@@ -536,6 +540,7 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
             local unit_type = "Normal"
             
             -- Assign weight and target count based on target type
+            -- Higher priority targets get higher weights and target counts for clustering
             if unit:is_boss() then
                 base_weight = boss_weight
                 target_count_value = boss_target_count or 5
@@ -557,6 +562,9 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
             local original_weight = base_weight
             
             -- Check for damage resistance buff and vulnerable debuff
+            -- Damage resistance providers get bonus weight (prioritize breaking auras)
+            -- Damage resistance receivers get penalty (avoid wasting spells)
+            -- Vulnerable enemies get bonus weight (prioritize finishing them)
             local buffs = buff_cache.get_buffs(unit)
             local has_vulnerable_debuff = false
             local buff_modifications = {}
@@ -584,6 +592,7 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
             end
             
             -- Check if unit is an infernal horde objective
+            -- These are special targets in infernal horde events that should be prioritized
             local unit_name = unit:get_skin_name()
             for _, objective_name in ipairs(my_utility.horde_objectives) do
                 if unit_name:match(objective_name) and unit:get_current_health() > 1 then
@@ -616,6 +625,8 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
         end
         
         -- Find clusters of enemies and calculate cluster weights and target counts
+        -- Clustering groups nearby enemies together to prioritize areas with multiple targets
+        -- This encourages AoE spells and prevents switching between isolated targets
         local clusters = {}
         local processed = {}
         
@@ -633,6 +644,7 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
                 processed[i] = true
                 
                 -- Find all targets within comparison_radius of this target
+                -- Group targets that are close together into clusters
                 for j, other_target in ipairs(weighted_targets) do
                     if i ~= j and not processed[j] then
                         if target.position:dist_to(other_target.position) <= comparison_radius then
@@ -669,6 +681,8 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
         end
         
         -- Stage 1: Filter clusters based on target count threshold
+        -- Only consider clusters with enough targets to be worth prioritizing
+        -- This prevents focusing on small groups when larger clusters exist
         local valid_clusters = {}
         for _, cluster in ipairs(clusters) do
             if cluster.total_target_count >= (cluster_min_target_count or 5) then
@@ -689,6 +703,8 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
         end
         
         -- Stage 2: Sort valid clusters by total weight (highest first) and select target
+        -- Choose the highest-weighted cluster, then target the highest-weight unit within it
+        -- This ensures we prioritize the most valuable groups and units within those groups
         if #valid_clusters > 0 then
             table.sort(valid_clusters, function(a, b) return a.total_weight > b.total_weight end)
             cached_weighted_target = valid_clusters[1].highest_weight_unit

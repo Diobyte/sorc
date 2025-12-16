@@ -418,26 +418,42 @@ on_update(function()
 
     -- Update targeting if needed
     if current_time >= next_target_update_time then
-        local enemies = actors_manager.get_enemy_npcs()
+        local success, enemies = pcall(actors_manager.get_enemy_npcs)
+        if not success or not enemies then
+            if _G.__sorc_debug__ then console.print("[ERROR] Failed to get enemy NPCs") end
+            enemies = {}
+        end
         local melee_range = my_utility.get_melee_range()
-        best_ranged_target, best_ranged_target_visible, best_melee_target, best_melee_target_visible,
-        best_cursor_target, closest_cursor_target, closest_cursor_target_angle,
-        ranged_max_score, ranged_max_score_visible, melee_max_score, melee_max_score_visible, cursor_max_score = evaluate_targets(enemies, melee_range)
+        local eval_success = pcall(function()
+            best_ranged_target, best_ranged_target_visible, best_melee_target, best_melee_target_visible,
+            best_cursor_target, closest_cursor_target, closest_cursor_target_angle,
+            ranged_max_score, ranged_max_score_visible, melee_max_score, melee_max_score_visible, cursor_max_score = evaluate_targets(enemies, melee_range)
+        end)
+        if not eval_success then
+            if _G.__sorc_debug__ then console.print("[ERROR] Target evaluation failed") end
+        end
 
         next_target_update_time = current_time + targeting_refresh_interval
     end
 
     -- Find closest target for fallback
     local player_position = get_player_position()
-    local closest_distance = 999999
-    for _, enemy in ipairs(actors_manager.get_enemy_npcs()) do
-        if enemy:is_enemy() and enemy:is_alive() then
-            local enemy_position = enemy:get_position()
-            local distance_sqr = player_position:squared_dist_to_ignore_z(enemy_position)
-            if distance_sqr < closest_distance then
-                closest_distance = distance_sqr
-                closest_target = enemy
-                closest_target_visible = enemy:is_visible()
+    if player_position then
+        local closest_distance = 999999
+        local success, enemies = pcall(actors_manager.get_enemy_npcs)
+        if success and enemies then
+            for _, enemy in ipairs(enemies) do
+                if enemy and enemy:is_enemy() and enemy:is_alive() then
+                    local enemy_position = enemy:get_position()
+                    if enemy_position then
+                        local distance_sqr = player_position:squared_dist_to_ignore_z(enemy_position)
+                        if distance_sqr < closest_distance then
+                            closest_distance = distance_sqr
+                            closest_target = enemy
+                            closest_target_visible = enemy:is_visible()
+                        end
+                    end
+                end
             end
         end
     end
@@ -457,9 +473,17 @@ on_update(function()
         if spell.menu_elements.targeting_mode then
             local targeting_mode = spell.menu_elements.targeting_mode:get()
 
-            -- Check for specific targeting maps in the spell module
+            -- Map spell-specific targeting modes to global target indices
+            -- This allows different spell types (melee/ranged) to have consistent targeting options
+            -- while using the same underlying target evaluation system
             if spell.targeting_type == "melee" then
-                -- Map melee modes to global indices
+                -- Map melee spell modes to global target indices:
+                -- 0: Melee Target -> 3 (best melee target)
+                -- 1: Melee Target (in sight) -> 4 (best melee target visible)
+                -- 2: Closest Target -> 5 (closest enemy)
+                -- 3: Closest Target (in sight) -> 6 (closest enemy visible)
+                -- 4: Best Cursor Target -> 7 (best target near cursor)
+                -- 5: Closest Cursor Target -> 8 (closest target to cursor)
                 local map = {
                     [0] = 3, -- Melee Target
                     [1] = 4, -- Melee Target (in sight)
@@ -470,7 +494,13 @@ on_update(function()
                 }
                 targeting_mode = map[targeting_mode] or 3 -- Default to Melee Target
             elseif spell.targeting_type == "ranged" then
-                -- Map ranged modes to global indices
+                -- Map ranged spell modes to global target indices:
+                -- 0: Ranged Target -> 1 (best ranged target)
+                -- 1: Ranged Target (in sight) -> 2 (best ranged target visible)
+                -- 2: Closest Target -> 5 (closest enemy)
+                -- 3: Closest Target (in sight) -> 6 (closest enemy visible)
+                -- 4: Best Cursor Target -> 7 (best target near cursor)
+                -- 5: Closest Cursor Target -> 8 (closest target to cursor)
                 local map = {
                     [0] = 1, -- Ranged Target
                     [1] = 2, -- Ranged Target (in sight)
@@ -481,7 +511,7 @@ on_update(function()
                 }
                 targeting_mode = map[targeting_mode] or 1 -- Default to Ranged Target
             else
-                -- Default to ranged if no type specified
+                -- Default mapping for spells without explicit type (assume ranged)
                 local map = {
                     [0] = 1, -- Ranged Target
                     [1] = 2, -- Ranged Target (in sight)
@@ -493,6 +523,7 @@ on_update(function()
                 targeting_mode = map[targeting_mode] or 1
             end
 
+            -- Select target based on mapped global index
             if targeting_mode == 1 then
                 target_unit = best_ranged_target
             elseif targeting_mode == 2 then
@@ -511,14 +542,20 @@ on_update(function()
                 target_unit = closest_cursor_target
             end
         else
-            -- Spells without targeting mode use ranged target
+            -- Spells without targeting mode use ranged target as default
             target_unit = best_ranged_target
         end
 
-        -- Call spell logic
-        if spell.logics(target_unit) then
+        -- Call spell logic with error handling
+        local success, result = pcall(spell.logics, target_unit)
+        if success and result then
             next_cast_time = current_time + my_utility.spell_delays.regular_cast
             return
+        elseif not success then
+            -- Log error but continue to next spell
+            if _G.__sorc_debug__ then
+                console.print("[ERROR] Spell logic failed for " .. spell_name .. ": " .. tostring(result))
+            end
         end
 
         ::continue::
@@ -547,15 +584,20 @@ on_render(function()
 
     -- Draw enemy circles
     if menu_elements.draw_enemy_circles:get() then
-        local enemies = actors_manager.get_enemy_npcs()
+        local success, enemies = pcall(actors_manager.get_enemy_npcs)
+        if success and enemies then
+            for i, obj in ipairs(enemies) do
+                local position = obj:get_position()
+                if position then
+                    graphics.circle_3d(position, 1, color_white(100))
 
-        for i, obj in ipairs(enemies) do
-            local position = obj:get_position();
-            graphics.circle_3d(position, 1, color_white(100));
-
-            local future_position = prediction.get_future_unit_position(obj, 0.4);
-            graphics.circle_3d(future_position, 0.25, color_yellow(100));
-        end;
+                    local future_position = prediction.get_future_unit_position(obj, 0.4)
+                    if future_position then
+                        graphics.circle_3d(future_position, 0.25, color_yellow(100))
+                    end
+                end
+            end
+        end
     end
 
     -- Draw targets
