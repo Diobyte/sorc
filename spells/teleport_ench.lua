@@ -7,12 +7,14 @@ local menu_elements =
 {
     tree_tab            = tree_node:new(1),
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "teleport_ench_main_boolean")),
+    debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "teleport_ench_debug_mode"))
 }
 
 local function menu()
     
     if menu_elements.tree_tab:push("Teleport Ench")then
-        menu_elements.main_boolean:render("Enable Spell", "")
+        menu_elements.main_boolean:render("Enable Teleport Ench", "Enhanced teleport spell")
+        menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
  
         menu_elements.tree_tab:pop()
     end
@@ -31,12 +33,19 @@ local function logics(target)
         return false;
     end;
     
+    local debug_enabled = menu_elements.debug_mode:get();
+    if debug_enabled then
+        console.print("[SPELL DEBUG] Teleport Ench - Casting");
+    end
+
     if cast_spell.self(spell_data.teleport_ench.spell_id, 0.0) then
 
         local current_time = get_time_since_inject();
         local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
-
+        if debug_enabled then
+            console.print("[SPELL DEBUG] Teleport Ench - Cast successful");
+        end
         return true;
     end;
 

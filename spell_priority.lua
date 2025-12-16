@@ -19,33 +19,218 @@
 local get_spell_priority
 
 -- Function to get base spell priority (without item adjustments)
-local function get_base_spell_priority(build_index)
-    if build_index == 1 then  -- Ball Lightning Build (Season 11 META)
+local function get_base_spell_priority(build_index, level)
+    -- Level-based adjustments
+    if level < 15 then
+        -- Levels 1-15: Fire Bolt spam
         return {
-            -- Core defensive spells (HIGH PRIORITY)
-            "flame_shield",  -- Defensive shield
-            "ice_armor",     -- Defensive armor
-
-            -- Main damage spells (Ball Lightning Meta)
-            "ball",          -- PRIMARY: Ball Lightning - Season 11 meta nuke
-            "chain_lightning", -- Chain damage amplifier
-            "charged_bolts", -- AoE damage and crit generation
-            "unstable_current", -- Ultimate chain damage
-
-            -- Supporting damage
-            "spark",         -- Mana generator and basic damage
-            "fire_bolt",     -- Fallback spam damage
-
-            -- Utility and mobility
-            "teleport",      -- Mobility
-            "teleport_ench", -- Enhanced teleport
-
-            -- Additional spells
-            "hydra",         -- Summon damage
-            "familiars",     -- Summon support
-            "frost_nova",    -- Emergency crowd control
+            "flame_shield",
+            "ice_armor",
+            "fire_bolt",
+            "spark",
+            "frost_nova",
         }
-    elseif build_index == 2 then  -- Fire Build (Strong Secondary)
+    elseif level < 25 then
+        -- Levels 15-25: Fireball transition
+        return {
+            "flame_shield",
+            "ice_armor",
+            "fireball",
+            "fire_bolt",
+            "spark",
+            "frost_nova",
+        }
+    elseif level < 35 then
+        -- Levels 25-35: Add Inferno for AoE
+        return {
+            "flame_shield",
+            "ice_armor",
+            "inferno",
+            "fireball",
+            "fire_bolt",
+            "spark",
+            "frost_nova",
+        }
+    elseif level < 45 then
+        -- Levels 35-45: Build specialization
+        if build_index == 1 then  -- Ball Lightning
+            return {
+                "flame_shield",
+                "ice_armor",
+                "ball",
+                "chain_lightning",
+                "charged_bolts",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        elseif build_index == 2 then  -- Fire
+            return {
+                "flame_shield",
+                "ice_armor",
+                "fireball",
+                "inferno",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        elseif build_index == 3 then  -- Frost
+            return {
+                "flame_shield",
+                "ice_armor",
+                "frozen_orb",
+                "frost_bolt",
+                "ice_shards",
+                "frost_nova",
+                "teleport",
+            }
+        elseif build_index == 4 then  -- Chain
+            return {
+                "flame_shield",
+                "ice_armor",
+                "chain_lightning",
+                "charged_bolts",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        else  -- Default
+            return {
+                "flame_shield",
+                "ice_armor",
+                "fireball",
+                "inferno",
+                "chain_lightning",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        end
+    else
+        -- Level 45+: End-game build priorities
+        if build_index == 1 then  -- Ball Lightning Build (Season 11 META)
+            return {
+                -- Core defensive spells (HIGH PRIORITY)
+                "flame_shield",  -- Defensive shield
+                "ice_armor",     -- Defensive armor
+
+                -- Main damage spells (Ball Lightning Meta)
+                "ball",          -- PRIMARY: Ball Lightning - Season 11 meta nuke
+                "chain_lightning", -- Chain damage amplifier
+                "charged_bolts", -- AoE damage and crit generation
+                "unstable_current", -- Ultimate chain damage
+
+                -- Supporting damage
+                "spark",         -- Mana generator and basic damage
+                "fire_bolt",     -- Fallback spam damage
+
+                -- Utility and mobility
+                "teleport",      -- Mobility
+                "teleport_ench", -- Enhanced teleport
+
+                -- Additional spells
+                "hydra",         -- Summon damage
+                "familiars",     -- Summon support
+                "frost_nova",    -- Emergency crowd control
+            }
+        elseif build_index == 2 then  -- Fire Build (Strong Secondary)
+            return {
+                -- Core defensive spells
+                "flame_shield",  -- Defensive shield (HIGH PRIORITY)
+                "ice_armor",     -- Defensive armor (HIGH PRIORITY)
+
+                -- Main damage spells
+                "fireball",      -- Primary nuke
+                "inferno",       -- High damage AoE
+                "meteor",        -- Ultimate AoE
+                "firewall",      -- Ground AoE
+                "incinerate",    -- Single target burst
+
+                -- Supporting spells
+                "spark",         -- Generator
+                "charged_bolts", -- AoE damage
+                "fire_bolt",     -- Basic spam
+
+                -- Utility and mobility
+                "teleport",      -- Mobility
+                "teleport_ench", -- Enhanced teleport
+
+                -- Melee option
+                "arc_lash",      -- Melee option
+            }
+        elseif build_index == 3 then  -- Frost Build (Crowd Control)
+            return {
+                -- Core defensive spells
+                "flame_shield",  -- Defensive shield (HIGH PRIORITY)
+                "ice_armor",     -- Defensive armor (HIGH PRIORITY)
+
+                -- Main damage spells
+                "frozen_orb",    -- Primary AoE
+                "blizzard",      -- Ultimate AoE
+                "ice_shards",    -- Multi-projectile
+                "frost_bolt",    -- Single target
+
+                -- Crowd control and finishers
+                "deep_freeze",   -- Stun finisher
+                "frost_nova",    -- AoE control
+
+                -- Utility and mobility
+                "teleport",      -- Mobility
+                "teleport_ench", -- Enhanced teleport
+
+                -- Supporting spells
+                "ice_blade",     -- Melee option
+                "spark",         -- Generator
+            }
+        elseif build_index == 4 then  -- Chain Lightning Build (Mobility)
+            return {
+                -- Core defensive spells
+                "flame_shield",  -- Defensive shield (HIGH PRIORITY)
+                "ice_armor",     -- Defensive armor (HIGH PRIORITY)
+
+                -- Main damage spells
+                "chain_lightning", -- Primary chain
+                "charged_bolts", -- AoE support
+                "unstable_current", -- Ultimate chain
+                "ball",          -- Ball for mobility
+
+                -- Supporting spells
+                "spark",         -- Generator
+                "fire_bolt",     -- Basic spam
+
+                -- Utility and mobility
+                "teleport",      -- Mobility
+                "teleport_ench", -- Enhanced teleport
+
+                -- Additional
+                "hydra",         -- Summon
+                "familiars",     -- Support
+                "frost_nova",    -- Control
+            }
+        else  -- Default: Balanced mix
+            return {
+                -- Core defensive spells
+                "flame_shield",
+                "ice_armor",
+
+                -- Balanced damage
+                "ball",
+                "chain_lightning",
+                "fireball",
+                "inferno",
+                "frozen_orb",
+                "charged_bolts",
+                "spark",
+                "fire_bolt",
+
+                -- Utility
+                "teleport",
+                "teleport_ench",
+                "frost_nova",
+            }
+        end
+    end
+end
         return {
             -- Core defensive spells
             "flame_shield",  -- Defensive shield (HIGH PRIORITY)
@@ -164,7 +349,7 @@ local function adjust_priorities_for_items(base_priorities)
 end
 
 -- Season 11 Leveling Guide: Returns spell priorities based on character level
-local function get_leveling_priorities(character_level)
+local function get_leveling_priorities(character_level, build_index)
     if character_level <= 15 then
         -- Levels 1-15: Fire Bolt spam for fast leveling
         return {
@@ -200,9 +385,64 @@ local function get_leveling_priorities(character_level)
         }
     elseif character_level <= 45 then
         -- Levels 35-45: Build specialization begins
-        return {
-            "flame_shield",  -- Defense
-            "ice_armor",     -- Defense
+        if build_index == 1 then  -- Ball Lightning
+            return {
+                "flame_shield",
+                "ice_armor",
+                "ball",
+                "chain_lightning",
+                "charged_bolts",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        elseif build_index == 2 then  -- Fire
+            return {
+                "flame_shield",
+                "ice_armor",
+                "fireball",
+                "inferno",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        elseif build_index == 3 then  -- Frost
+            return {
+                "flame_shield",
+                "ice_armor",
+                "frozen_orb",
+                "frost_bolt",
+                "ice_shards",
+                "frost_nova",
+                "teleport",
+            }
+        elseif build_index == 4 then  -- Chain
+            return {
+                "flame_shield",
+                "ice_armor",
+                "chain_lightning",
+                "charged_bolts",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        else  -- Default
+            return {
+                "flame_shield",
+                "ice_armor",
+                "fireball",
+                "inferno",
+                "chain_lightning",
+                "fire_bolt",
+                "spark",
+                "teleport",
+            }
+        end
+    else  -- Level 45+: End-game priorities
+        -- Use build-specific priorities (this will be handled by get_spell_priority)
+        return get_base_spell_priority(build_index, character_level)  -- Pass level for consistency
+    end
+end
             "ball",          -- Season 11 META: Ball Lightning
             "fireball",      -- Versatile nuke
             "inferno",       -- High AoE
@@ -224,10 +464,10 @@ local function get_spell_priority(build_index, character_level)
 
     -- If character level is provided and below 45, use leveling priorities
     if character_level and character_level < 45 then
-        base_priorities = get_leveling_priorities(character_level)
+        base_priorities = get_leveling_priorities(character_level, build_index)
     else
         -- Use build-specific priorities for end-game
-        base_priorities = get_base_spell_priority(build_index)
+        base_priorities = get_base_spell_priority(build_index, character_level or 50)
     end
 
     return adjust_priorities_for_items(base_priorities)

@@ -8,40 +8,52 @@ local menu_elements =
     tree_tab              = tree_node:new(1),
     main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "chain_lightning_main_bool_base")),
     targeting_mode        = combo_box:new(0, get_hash(my_utility.plugin_label .. "chain_lightning_targeting_mode")),
-    min_target_range      = slider_float:new(1.0, max_spell_range - 1, 5.0, get_hash(my_utility.plugin_label .. "chain_lightning_min_target_range"))
+    min_target_range      = slider_float:new(1.0, max_spell_range - 1, 5.0, get_hash(my_utility.plugin_label .. "chain_lightning_min_target_range")),
+    debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "chain_lightning_debug_mode"))
 }
 
 local function menu()
     
     if menu_elements.tree_tab:push("Chain Lightning") then
-        menu_elements.main_boolean:render("Enable Spell", "")
+        menu_elements.main_boolean:render("Enable Chain Lightning", "Lightning spell that chains between enemies")
+        menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
         if menu_elements.main_boolean:get() then
             menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged, my_utility.targeting_mode_description)
             menu_elements.min_target_range:render("Min Target Range", "", 1)
         end
-
+ 
         menu_elements.tree_tab:pop()
-    end 
+    end
 end
 
 local next_time_allowed_cast = 0.0;
 local function logics(target)
     
     local menu_boolean = menu_elements.main_boolean:get();
+    local debug_enabled = menu_elements.debug_mode:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
                 menu_boolean, 
                 next_time_allowed_cast, 
                 spell_data.chain_lightning.spell_id);
 
     if not is_logic_allowed then
+        if debug_enabled then
+            console.print("[CHAIN LIGHTNING DEBUG] Logic not allowed - spell conditions not met")
+        end
         return false;
     end;
     
     if not target then
+        if debug_enabled then
+            console.print("[CHAIN LIGHTNING DEBUG] No target")
+        end
         return false;
     end;
 
     if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
+        if debug_enabled then
+            console.print("[CHAIN LIGHTNING DEBUG] Target out of range")
+        end
         return false
     end
 
@@ -51,7 +63,7 @@ local function logics(target)
         local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
 
-        if _G.__sorc_debug__ then
+        if debug_enabled then
             console.print("Cast Chain Lightning - Target: " .. my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
 

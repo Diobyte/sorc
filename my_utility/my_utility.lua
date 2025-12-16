@@ -306,6 +306,22 @@ local function enemy_count_in_range(position, range, enemies_list)
     return count
 end
 
+-- Lightweight helper to fetch enemies within a radius of a position.
+-- Keeps all targeting in-house instead of ad-hoc scans in individual spells.
+local function get_enemies_in_range(position, range)
+    local enemies_in_range = {}
+    local enemies = actors_manager.get_enemy_npcs()
+    for _, enemy in ipairs(enemies) do
+        if enemy and enemy:is_enemy() and enemy:is_alive() then
+            local enemy_pos = enemy:get_position()
+            if enemy_pos and enemy_pos:dist_to(position) <= range then
+                table.insert(enemies_in_range, enemy)
+            end
+        end
+    end
+    return enemies_in_range
+end
+
 local function record_spell_cast(spell_id)
     _G.last_cast_time = _G.last_cast_time or {}
     _G.last_cast_time[spell_id] = get_time_since_inject()
@@ -380,6 +396,7 @@ return {
     is_target_within_angle = is_target_within_angle,
     get_best_point_rec = get_best_point_rec,
     enemy_count_in_range = enemy_count_in_range,
+    get_enemies_in_range = get_enemies_in_range,
     horde_objectives = horde_objectives,
     get_equipped_spells_and_lookup = function()
         local equipped_spells = get_equipped_spell_ids()
@@ -388,5 +405,22 @@ return {
             equipped_lookup[spell_id] = true
         end
         return equipped_spells, equipped_lookup
+    end,
+
+    -- Crackling Energy Snapshot functionality
+    track_ball_cast = function()
+        _G.ball_cast_count = (_G.ball_cast_count or 0) + 1
+    end,
+    has_enough_ball_casts = function(min_casts)
+        return (_G.ball_cast_count or 0) >= min_casts
+    end,
+    get_ball_cast_count = function()
+        return _G.ball_cast_count or 0
+    end,
+    end_crackling_energy_loop = function()
+        _G.ball_cast_count = 0
+    end,
+    is_crackling_energy_loop_active = function()
+        return (_G.ball_cast_count or 0) > 0
     end
 }

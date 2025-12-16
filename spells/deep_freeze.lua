@@ -8,11 +8,13 @@ local menu_elements =
     tree_tab            = tree_node:new(1),
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "deep_freeze_main_bool_base")),
     min_enemies         = slider_int:new(1, 10, 3, get_hash(my_utility.plugin_label .. "deep_freeze_min_enemies")),
+    debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "deep_freeze_debug_mode"))
 }
 
 local function menu()
     if menu_elements.tree_tab:push("Deep Freeze") then
         menu_elements.main_boolean:render("Enable Deep Freeze", "AoE stun that freezes enemies in place")
+        menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
         if menu_elements.main_boolean:get() then
             menu_elements.min_enemies:render("Minimum Enemies", "Minimum number of enemies in range to cast")
         end
@@ -35,11 +37,16 @@ local function logics(target)
         return false;
     end
 
+    local debug_enabled = menu_elements.debug_mode:get();
+    if debug_enabled then
+        console.print("[SPELL DEBUG] Deep Freeze - Casting on " .. enemies_in_range .. " enemies");
+    end
+
     if cast_spell.self(spell_data.deep_freeze.spell_id, 0) then
         local current_time = get_time_since_inject();
         next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
-        if _G.__sorc_debug__ then
-            console.print("Cast Deep Freeze - Enemies: " .. enemies_in_range);
+        if debug_enabled then
+            console.print("[SPELL DEBUG] Deep Freeze - Cast successful");
         end
         return true;
     end;

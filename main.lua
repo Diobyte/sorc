@@ -65,6 +65,10 @@ local menu_elements =
         get_hash(my_utility.plugin_label .. "enemy_weight_boss")),
     enemy_weight_damage_resistance = slider_int:new(1, 100, 25,
         get_hash(my_utility.plugin_label .. "enemy_weight_damage_resistance")),
+    enemy_weight_vulnerable_debuff = slider_int:new(1, 100, 10,
+        get_hash(my_utility.plugin_label .. "enemy_weight_vulnerable_debuff")),
+    enemy_weight_horde_objective   = slider_int:new(1, 100, 5,
+        get_hash(my_utility.plugin_label .. "enemy_weight_horde_objective")),
 
     debug_tree                     = tree_node:new(1),
     enable_debug                   = checkbox:new(false, get_hash(my_utility.plugin_label .. "enable_debug")),
@@ -74,6 +78,15 @@ local menu_elements =
     draw_melee_range               = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_melee_range")),
     draw_cursor_target             = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_cursor_target")),
     draw_enemy_circles             = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_enemy_circles")),
+    draw_weighted_scores           = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_weighted_scores")),
+
+    weighted_targeting_tree             = tree_node:new(1),
+    weighted_targeting_enabled          = checkbox:new(false, get_hash(my_utility.plugin_label .. "weighted_targeting_enabled")),
+    weighted_targeting_debug            = checkbox:new(false, get_hash(my_utility.plugin_label .. "weighted_targeting_debug")),
+    scan_radius                         = slider_float:new(1.0, 30.0, 12.0, get_hash(my_utility.plugin_label .. "scan_radius")),
+    scan_refresh_rate                   = slider_float:new(0.1, 1.0, 0.2, get_hash(my_utility.plugin_label .. "scan_refresh_rate")),
+    min_targets                         = slider_int:new(1, 10, 1, get_hash(my_utility.plugin_label .. "min_targets")),
+    comparison_radius                   = slider_float:new(0.1, 6.0, 1.5, get_hash(my_utility.plugin_label .. "comparison_radius")),
 
     spells_tree                    = tree_node:new(1),
     disabled_spells_tree           = tree_node:new(1),
@@ -172,6 +185,10 @@ on_render_menu(function()
                 "Weighing score for boss enemies - default is 50")
             menu_elements.enemy_weight_damage_resistance:render("Damage Resistance Aura Enemy Weight",
                 "Weighing score for enemies with damage resistance aura - default is 25")
+            menu_elements.enemy_weight_vulnerable_debuff:render("Vulnerable Debuff Enemy Weight",
+                "Weighing score for enemies with vulnerable debuff - default is 10")
+            menu_elements.enemy_weight_horde_objective:render("Horde Objective Enemy Weight",
+                "Weighing score for horde objective enemies - default is 5")
             menu_elements.enemy_weights_tree:pop()
         end
 
@@ -188,6 +205,8 @@ on_render_menu(function()
                 menu_elements.draw_cursor_target:render("Display Cursor Target", cursor_target_description)
                 menu_elements.draw_enemy_circles:render("Display Enemy Circles",
                     "Draw enemy circles")
+                menu_elements.draw_weighted_scores:render("Display Weighted Scores",
+                    "Draw target scores when weighted targeting is enabled")
                 menu_elements.debug_tree:pop()
             end
         end
@@ -196,6 +215,23 @@ on_render_menu(function()
     end
 
     local equipped_spells = get_equipped_spell_ids()
+
+    -- Check for teleport_ench buff (buff_id 516547)
+    local has_teleport_ench_buff = false
+    local player_buffs = local_player:get_buffs()
+    if player_buffs then
+        for _, buff in ipairs(player_buffs) do
+            if buff.name_hash == 516547 then
+                has_teleport_ench_buff = true
+                break
+            end
+        end
+    end
+    
+    -- If teleport_ench buff is detected, add it to equipped spells
+    if has_teleport_ench_buff then
+        table.insert(equipped_spells, spell_data.teleport_ench.spell_id)
+    end
 
     -- Create a lookup table for equipped spells
     local equipped_lookup = {}
@@ -270,7 +306,7 @@ local angle_table = { false, 90.0 } -- max angle
 
 -- Cache for heavy function results
 local next_target_update_time = 0.0 -- Time of next target evaluation
-local next_cast_time = 0.0          -- Time of next possible cast
+local cast_end_time = 0.0          -- Time of next possible cast
 local targeting_refresh_interval = menu_elements.targeting_refresh_interval:get()
 
 -- Default enemy weights for different enemy types
@@ -337,6 +373,11 @@ local function evaluate_targets(target_list, melee_range)
             local enemy_count_in_radius = my_utility.enemy_count_in_range(target_position,
                 menu_elements.best_target_evaluation_radius:get(), target_list)
             enemy_score = enemy_score * (1.0 + enemy_count_in_radius * 0.1)
+
+            -- Proximity bonus (nearby enemies in comparison radius)
+            local nearby_enemies = my_utility.enemy_count_in_range(target_position,
+                menu_elements.comparison_radius:get() or 1.5, target_list)
+            enemy_score = enemy_score * (1.0 + nearby_enemies * 0.1)
 
             -- Visibility
             local is_visible = target:is_visible()
@@ -408,158 +449,206 @@ local function evaluate_targets(target_list, melee_range)
 end
 
 on_update(function()
+    -- Live logger toggle (menu driven)
+    if menu_elements.file_logging_enabled:get() then
+        if not logger.is_ready() then logger.init() end
+    elseif logger.is_ready() then
+        logger.close()
+    end
+
     if not menu_elements.main_boolean:get() then
         return
     end
 
+    if not my_utility.is_action_allowed() then
+        return
+    end
+
     local current_time = get_time_since_inject()
-    if current_time < next_cast_time then
+    if current_time < cast_end_time then
         return
     end
 
     -- Update targeting if needed
     if current_time >= next_target_update_time then
-        local success, enemies = pcall(actors_manager.get_enemy_npcs)
-        if not success or not enemies then
-            if _G.__sorc_debug__ then console.print("[ERROR] Failed to get enemy NPCs") end
-            enemies = {}
-        end
-        local melee_range = my_utility.get_melee_range()
-        local eval_success = pcall(function()
-            best_ranged_target, best_ranged_target_visible, best_melee_target, best_melee_target_visible,
-            best_cursor_target, closest_cursor_target, closest_cursor_target_angle,
-            ranged_max_score, ranged_max_score_visible, melee_max_score, melee_max_score_visible, cursor_max_score = evaluate_targets(enemies, melee_range)
-        end)
-        if not eval_success then
-            if _G.__sorc_debug__ then console.print("[ERROR] Target evaluation failed") end
+        local player_position = get_player_position()
+        max_targeting_range = menu_elements.max_targeting_range:get()
+
+        local entity_list_visible, entity_list = my_target_selector.get_target_list(
+            player_position,
+            max_targeting_range,
+            collision_table,
+            floor_table,
+            angle_table)
+
+        target_selector_data_all = my_target_selector.get_target_selector_data(
+            player_position,
+            entity_list)
+
+        local target_selector_data_visible = my_target_selector.get_target_selector_data(
+            player_position,
+            entity_list_visible)
+
+        if target_selector_data_all and target_selector_data_all.is_valid then
+            local melee_range = my_utility.get_melee_range()
+
+            -- Update enemy weights
+            if menu_elements.custom_enemy_weights:get() then
+                normal_monster_value = menu_elements.enemy_weight_normal:get()
+                elite_value = menu_elements.enemy_weight_elite:get()
+                champion_value = menu_elements.enemy_weight_champion:get()
+                boss_value = menu_elements.enemy_weight_boss:get()
+                damage_resistance_value = menu_elements.enemy_weight_damage_resistance:get()
+            else
+                normal_monster_value = 2
+                elite_value = 10
+                champion_value = 15
+                boss_value = 50
+                damage_resistance_value = 25
+            end
+
+            -- Check all targets within max range
+            best_ranged_target, best_melee_target, best_cursor_target, closest_cursor_target, ranged_max_score, melee_max_score, cursor_max_score, closest_cursor_target_angle = evaluate_targets(target_selector_data_all.list, melee_range)
+
+            -- Weighted targeting optional override (aligned with paladin pattern)
+            if menu_elements.weighted_targeting_enabled:get() then
+                local weighted_target = my_target_selector.get_weighted_target(
+                    player_position,
+                    menu_elements.scan_radius:get(),
+                    menu_elements.min_targets:get(),
+                    menu_elements.comparison_radius:get(),
+                    menu_elements.enemy_weight_boss:get(),
+                    menu_elements.enemy_weight_elite:get(),
+                    menu_elements.enemy_weight_champion:get(),
+                    menu_elements.enemy_weight_normal:get(),
+                    menu_elements.scan_refresh_rate:get(),
+                    menu_elements.enemy_weight_damage_resistance:get(),
+                    5,    -- damage_resistance_receiver_penalty (modest default)
+                    50,   -- horde_objective_weight default
+                    1,    -- vulnerable_debuff_weight default
+                    menu_elements.min_targets:get(), -- cluster_min_target_count
+                    1, 5, 5, 5, -- normal/champ/elite/boss target counts
+                    menu_elements.weighted_targeting_debug:get())
+
+                if weighted_target then
+                    best_ranged_target = weighted_target
+                    best_melee_target = weighted_target
+                    best_cursor_target = weighted_target
+                    closest_cursor_target = weighted_target
+                    closest_target = weighted_target
+                end
+            end
+
+            -- Check visible targets within max range
+            best_ranged_target_visible, best_melee_target_visible, _, _, ranged_max_score_visible, melee_max_score_visible, _ = evaluate_targets(target_selector_data_visible.list, melee_range)
+
+            closest_target = closest_target or target_selector_data_all.closest_unit
+            closest_target_visible = closest_target_visible or target_selector_data_visible.closest_unit
         end
 
         next_target_update_time = current_time + targeting_refresh_interval
     end
 
-    -- Find closest target for fallback
-    local player_position = get_player_position()
-    if player_position then
-        local closest_distance = 999999
-        local success, enemies = pcall(actors_manager.get_enemy_npcs)
-        if success and enemies then
-            for _, enemy in ipairs(enemies) do
-                if enemy and enemy:is_enemy() and enemy:is_alive() then
-                    local enemy_position = enemy:get_position()
-                    if enemy_position then
-                        local distance_sqr = player_position:squared_dist_to_ignore_z(enemy_position)
-                        if distance_sqr < closest_distance then
-                            closest_distance = distance_sqr
-                            closest_target = enemy
-                            closest_target_visible = enemy:is_visible()
-                        end
-                    end
+    -- Helper to select target per spell using paladin-aligned maps
+    local function select_target(spell)
+        local target_unit = nil
+        if spell.menu_elements.priority_target and spell.menu_elements.priority_target:get() then
+            -- Enhanced priority targeting: prefer boss > champion > elite > normal
+            if best_ranged_target then
+                if best_ranged_target:is_boss() then
+                    return best_ranged_target
+                elseif best_ranged_target:is_champion() then
+                    return best_ranged_target
+                elseif best_ranged_target:is_elite() then
+                    return best_ranged_target
                 end
             end
+            -- If no priority target found, fall through to normal targeting
         end
-    end
-
-    -- Cast spells in priority order
-    for _, spell_name in ipairs(current_spell_priority) do
-        local spell = spells[spell_name]
-        if not spell then
-            goto continue
-        end
-
-        if not spell.menu_elements.main_boolean:get() then
-            goto continue
-        end
-
-        local target_unit = nil
         if spell.menu_elements.targeting_mode then
             local targeting_mode = spell.menu_elements.targeting_mode:get()
 
-            -- Map spell-specific targeting modes to global target indices
-            -- This allows different spell types (melee/ranged) to have consistent targeting options
-            -- while using the same underlying target evaluation system
             if spell.targeting_type == "melee" then
-                -- Map melee spell modes to global target indices:
-                -- 0: Melee Target -> 3 (best melee target)
-                -- 1: Melee Target (in sight) -> 4 (best melee target visible)
-                -- 2: Closest Target -> 5 (closest enemy)
-                -- 3: Closest Target (in sight) -> 6 (closest enemy visible)
-                -- 4: Best Cursor Target -> 7 (best target near cursor)
-                -- 5: Closest Cursor Target -> 8 (closest target to cursor)
                 local map = {
-                    [0] = 3, -- Melee Target
-                    [1] = 4, -- Melee Target (in sight)
-                    [2] = 5, -- Closest Target
-                    [3] = 6, -- Closest Target (in sight)
-                    [4] = 7, -- Best Cursor Target
-                    [5] = 8  -- Closest Cursor Target
+                    [0] = 3, -- best melee target
+                    [1] = 4, -- best melee visible
+                    [2] = 5, -- closest
+                    [3] = 6, -- closest visible
+                    [4] = 7, -- best cursor
+                    [5] = 8  -- closest cursor
                 }
-                targeting_mode = map[targeting_mode] or 3 -- Default to Melee Target
-            elseif spell.targeting_type == "ranged" then
-                -- Map ranged spell modes to global target indices:
-                -- 0: Ranged Target -> 1 (best ranged target)
-                -- 1: Ranged Target (in sight) -> 2 (best ranged target visible)
-                -- 2: Closest Target -> 5 (closest enemy)
-                -- 3: Closest Target (in sight) -> 6 (closest enemy visible)
-                -- 4: Best Cursor Target -> 7 (best target near cursor)
-                -- 5: Closest Cursor Target -> 8 (closest target to cursor)
+                targeting_mode = map[targeting_mode] or 3
+            else -- default ranged
                 local map = {
-                    [0] = 1, -- Ranged Target
-                    [1] = 2, -- Ranged Target (in sight)
-                    [2] = 5, -- Closest Target
-                    [3] = 6, -- Closest Target (in sight)
-                    [4] = 7, -- Best Cursor Target
-                    [5] = 8  -- Closest Cursor Target
-                }
-                targeting_mode = map[targeting_mode] or 1 -- Default to Ranged Target
-            else
-                -- Default mapping for spells without explicit type (assume ranged)
-                local map = {
-                    [0] = 1, -- Ranged Target
-                    [1] = 2, -- Ranged Target (in sight)
-                    [2] = 5, -- Closest Target
-                    [3] = 6, -- Closest Target (in sight)
-                    [4] = 7, -- Best Cursor Target
-                    [5] = 8  -- Closest Cursor Target
+                    [0] = 1, -- best ranged
+                    [1] = 2, -- best ranged visible
+                    [2] = 5, -- closest
+                    [3] = 6, -- closest visible
+                    [4] = 7, -- best cursor
+                    [5] = 8  -- closest cursor
                 }
                 targeting_mode = map[targeting_mode] or 1
             end
 
-            -- Select target based on mapped global index
-            if targeting_mode == 1 then
-                target_unit = best_ranged_target
-            elseif targeting_mode == 2 then
-                target_unit = best_ranged_target_visible
-            elseif targeting_mode == 3 then
-                target_unit = best_melee_target
-            elseif targeting_mode == 4 then
-                target_unit = best_melee_target_visible
-            elseif targeting_mode == 5 then
-                target_unit = closest_target
-            elseif targeting_mode == 6 then
-                target_unit = closest_target_visible
-            elseif targeting_mode == 7 then
-                target_unit = best_cursor_target
-            elseif targeting_mode == 8 then
-                target_unit = closest_cursor_target
-            end
+            target_unit = ({
+                [1] = best_ranged_target,
+                [2] = best_ranged_target_visible,
+                [3] = best_melee_target,
+                [4] = best_melee_target_visible,
+                [5] = closest_target,
+                [6] = closest_target_visible,
+                [7] = best_cursor_target,
+                [8] = closest_cursor_target
+            })[targeting_mode]
         else
-            -- Spells without targeting mode use ranged target as default
             target_unit = best_ranged_target
         end
+        return target_unit
+    end
 
-        -- Call spell logic with error handling
-        local success, result = pcall(spell.logics, target_unit)
-        if success and result then
-            next_cast_time = current_time + my_utility.spell_delays.regular_cast
-            return
-        elseif not success then
-            -- Log error but continue to next spell
-            if _G.__sorc_debug__ then
-                console.print("[ERROR] Spell logic failed for " .. spell_name .. ": " .. tostring(result))
-            end
+    -- Spell parameters for flexible argument passing
+    local spell_params = {
+        fireball = { args = {nil} },  -- Will be set to target_unit
+        blizzard = { args = {nil, nil} },  -- target, target_selector_data
+        inferno = { args = {nil, nil} },  -- target, target_selector_data
+        firewall = { args = {nil, nil} },  -- target, target_selector_data for collision detection
+        meteor = { args = {nil} },
+        -- Default for others: { args = {nil} }
+    }
+
+    local function use_ability(spell_name)
+        local spell = spells[spell_name]
+        if not spell or not spell.menu_elements.main_boolean:get() then
+            return false
         end
 
-        ::continue::
+        local target_unit = select_target(spell)
+        local params = spell_params[spell_name] or { args = {target_unit} }
+        params.args[1] = target_unit  -- Set target
+        if #params.args > 1 then
+            params.args[2] = target_selector_data_all  -- For spells needing data
+        end
+        local ok, cast_result, cooldown = pcall(spell.logics, unpack(params.args))
+        if not ok then
+            if _G.__sorc_debug__ then
+                console.print("[ERROR] Spell logic failed for " .. spell_name .. ": " .. tostring(cast_result))
+            end
+            return false
+        end
+
+        if cast_result then
+            local cd = cooldown or my_utility.spell_delays.regular_cast
+            cast_end_time = current_time + cd
+            return true
+        end
+        return false
+    end
+
+    -- Cast spells in priority order
+    for _, spell_name in ipairs(current_spell_priority) do
+        if use_ability(spell_name) then
+            break  -- Changed from return to break to allow proper timing control
+        end
     end
 end)
 
@@ -684,5 +773,11 @@ on_render(function()
         end
     end
 end);
+
+-- Additional debug: Draw weighted scores if enabled
+if menu_elements.enable_debug:get() and menu_elements.draw_weighted_scores:get() and menu_elements.weighted_targeting_enabled:get() then
+    -- This would require storing scores per target, for now just note it's enabled
+    -- In a full implementation, modify evaluate_targets to return a map of targets to scores
+end
 
 console.print("Lua Plugin - Sorcerer Dirty - Version 1.0.4")

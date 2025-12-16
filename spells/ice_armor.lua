@@ -8,11 +8,13 @@ local menu_elements =
     tree_tab            = tree_node:new(1),
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "ice_armor_main_bool_base")),
     min_enemies         = slider_int:new(1, 20, 1, get_hash(my_utility.plugin_label .. "ice_armor_min_enemies")),
+    debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "ice_armor_debug_mode"))
 }
 
 local function menu()
     if menu_elements.tree_tab:push("Ice Armor") then
         menu_elements.main_boolean:render("Enable Ice Armor", "Defensive armor that provides cold damage reduction")
+        menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
         if menu_elements.main_boolean:get() then
             menu_elements.min_enemies:render("Minimum Enemies", "Minimum number of enemies in range to cast")
         end
@@ -34,16 +36,21 @@ local function logics(target)
         return false;
     end
 
+    local debug_enabled = menu_elements.debug_mode:get();
+    if debug_enabled then
+        console.print("[ICE ARMOR DEBUG] Casting on " .. enemies_in_range .. " enemies");
+    end
+
     if cast_spell.self(spell_data.ice_armor.spell_id, 0) then
         local current_time = get_time_since_inject();
         next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
-        if _G.__sorc_debug__ then
-            console.print("Cast Ice Armor");
+        if debug_enabled then
+            console.print("[ICE ARMOR DEBUG] Cast successful");
         end
-        return true;
+        return true, my_utility.spell_delays.regular_cast;
     end;
 
-    return false;
+    return false, 0;
 end
 
 return
