@@ -54,7 +54,7 @@ local function logics(target)
         if debug_enabled then
             console.print("[CHAIN LIGHTNING DEBUG] Target out of range")
         end
-        return false
+        return false, 0
     end
 
     if cast_spell.target(target, spell_data.chain_lightning.spell_id, 0) then
@@ -67,10 +67,10 @@ local function logics(target)
             console.print("Cast Chain Lightning - Target: " .. my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
 
-        return true;
+        return true, cooldown;
     end;
 
-    return false;
+    return false, 0;
 end
 
 return

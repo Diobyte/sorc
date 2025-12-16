@@ -43,14 +43,14 @@ local function logics(target)
         if debug_enabled then
             console.print("[FIRE BOLT DEBUG] Logic not allowed - spell conditions not met")
         end
-        return false
+        return false, 0
     end;
 
     if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
         if debug_enabled then
             console.print("[FIRE BOLT DEBUG] Target out of range")
         end
-        return false
+        return false, 0
     end
 
     if cast_spell.target(target, spell_data.fire_bolt.spell_id, 0) then
@@ -60,20 +60,11 @@ local function logics(target)
             console.print("Cast Fire Bolt - Target: " ..
                 my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
-        return true;
+        return true, my_utility.spell_delays.regular_cast;
     end;
 
-    return false;
+    return false, 0;
 end
-            console.print("Cast Fire Bolt - Target: " ..
-                my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
-        end
-        return true;
-    end;
-
-    return false;
-end
-
 return
 {
     menu = menu,

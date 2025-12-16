@@ -306,7 +306,7 @@ local angle_table = { false, 90.0 } -- max angle
 
 -- Cache for heavy function results
 local next_target_update_time = 0.0 -- Time of next target evaluation
-local cast_end_time = 0.0          -- Time of next possible cast
+local cast_end_time = 0.0          -- Time when casting is allowed again
 local targeting_refresh_interval = menu_elements.targeting_refresh_interval:get()
 
 -- Default enemy weights for different enemy types
@@ -553,17 +553,10 @@ on_update(function()
     local function select_target(spell)
         local target_unit = nil
         if spell.menu_elements.priority_target and spell.menu_elements.priority_target:get() then
-            -- Enhanced priority targeting: prefer boss > champion > elite > normal
-            if best_ranged_target then
-                if best_ranged_target:is_boss() then
-                    return best_ranged_target
-                elseif best_ranged_target:is_champion() then
-                    return best_ranged_target
-                elseif best_ranged_target:is_elite() then
-                    return best_ranged_target
-                end
+            -- Priority targeting: prefer boss > champion > elite > any
+            if best_ranged_target and (best_ranged_target:is_boss() or best_ranged_target:is_champion() or best_ranged_target:is_elite()) then
+                return best_ranged_target
             end
-            -- If no priority target found, fall through to normal targeting
         end
         if spell.menu_elements.targeting_mode then
             local targeting_mode = spell.menu_elements.targeting_mode:get()
@@ -611,7 +604,7 @@ on_update(function()
         fireball = { args = {nil} },  -- Will be set to target_unit
         blizzard = { args = {nil, nil} },  -- target, target_selector_data
         inferno = { args = {nil, nil} },  -- target, target_selector_data
-        firewall = { args = {nil, nil} },  -- target, target_selector_data for collision detection
+        firewall = { args = {nil, nil} },  -- target, target_selector_data
         meteor = { args = {nil} },
         -- Default for others: { args = {nil} }
     }
@@ -647,7 +640,7 @@ on_update(function()
     -- Cast spells in priority order
     for _, spell_name in ipairs(current_spell_priority) do
         if use_ability(spell_name) then
-            break  -- Changed from return to break to allow proper timing control
+            return
         end
     end
 end)

@@ -38,14 +38,14 @@ local function logics(target)
 
     local debug_enabled = menu_elements.debug_mode:get();
     if debug_enabled then
-        console.print("[ICE ARMOR DEBUG] Casting on " .. enemies_in_range .. " enemies");
+        console.print("[SPELL DEBUG] Ice Armor - Casting on " .. enemies_in_range .. " enemies");
     end
 
     if cast_spell.self(spell_data.ice_armor.spell_id, 0) then
         local current_time = get_time_since_inject();
         next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
         if debug_enabled then
-            console.print("[ICE ARMOR DEBUG] Cast successful");
+            console.print("[SPELL DEBUG] Ice Armor - Cast successful");
         end
         return true, my_utility.spell_delays.regular_cast;
     end;

@@ -72,7 +72,7 @@ local function logics(target)
         if debug_enabled then
             console.print("[INFERNO DEBUG] Insufficient mana: " .. string.format("%.1f", mana_pct * 100) .. "%")
         end
-        return false
+        return false, 0
     end
 
     local player_position = get_player_position()

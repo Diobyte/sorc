@@ -56,7 +56,7 @@ local function logics(target)
         if debug_enabled then
             console.print("[BALL DEBUG] Target out of range")
         end
-        return false
+        return false, 0
     end
 
     if cast_spell.target(target, spell_data.ball.spell_id, 0) then

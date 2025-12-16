@@ -28,13 +28,13 @@ local function logics(target)
     -- Unstable Current is a self-cast AoE ultimate - doesn't need a target
     local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(menu_boolean, next_time_allowed_cast, spell_data.unstable_current.spell_id);
-    if not is_logic_allowed then return false end;
+    if not is_logic_allowed then return false, 0 end;
 
     -- Check for minimum enemies in range
     local player_position = get_player_position();
     local enemies_in_range = my_utility.enemy_count_in_range(player_position, spell_data.unstable_current.data.radius); -- Unstable Current range
     if enemies_in_range < menu_elements.min_enemies:get() then
-        return false;
+        return false, 0;
     end
 
     local debug_enabled = menu_elements.debug_mode:get();
@@ -48,10 +48,10 @@ local function logics(target)
         if debug_enabled then
             console.print("[SPELL DEBUG] Unstable Current - Cast successful");
         end
-        return true;
+        return true, my_utility.spell_delays.regular_cast;
     end;
 
-    return false;
+    return false, 0;
 end
 
 return

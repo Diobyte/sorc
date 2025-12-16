@@ -47,7 +47,7 @@ local function logics(target)
         if debug_enabled then
             console.print("[FIREBALL DEBUG] Logic not allowed - spell conditions not met")
         end
-        return false
+        return false, 0
     end
 
     -- Mana check
@@ -57,14 +57,14 @@ local function logics(target)
         if debug_enabled then
             console.print("[FIREBALL DEBUG] Insufficient mana: " .. string.format("%.1f", mana_pct * 100) .. "%")
         end
-        return false
+        return false, 0
     end;
 
     if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
         if debug_enabled then
             console.print("[FIREBALL DEBUG] Target out of range")
         end
-        return false
+        return false, 0
     end
 
     if cast_spell.target(target, spell_data.fireball.spell_id, 0) then

@@ -31,7 +31,7 @@ end
 
 local next_time_allowed_cast = 0.0;
 
-local function logics(target, target_selector_data)
+local function logics(target, target_selector_data_all)
     
     local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
@@ -65,8 +65,8 @@ local function logics(target, target_selector_data)
 
     -- Check for existing firewall collision
     local should_cast_firewall = true
-    if target_selector_data and target_selector_data.list then
-        for _, actor in ipairs(target_selector_data.list) do
+    if target_selector_data_all and target_selector_data_all.list then
+        for _, actor in ipairs(target_selector_data_all.list) do
             if actor and actor:is_enemy() and actor:is_alive() then
                 local actor_name = actor:get_skin_name()
                 if actor_name == "Generic_Proxy_firewall" then
@@ -76,7 +76,7 @@ local function logics(target, target_selector_data)
                     if dx <= 2 and dy <= 8 then  -- rectangle width is 2 and height is 8
                         should_cast_firewall = false
                         if debug_enabled then
-                            console.print("[FIREWALL DEBUG] Existing firewall detected, skipping cast")
+                            console.print("[SPELL DEBUG] Firewall - Collision detected with existing firewall")
                         end
                         break
                     end
@@ -90,7 +90,7 @@ local function logics(target, target_selector_data)
     end
 
     if debug_enabled then
-        console.print("[FIREWALL DEBUG] Casting at position");
+        console.print("[SPELL DEBUG] Firewall - Casting at position");
     end
 
     if cast_spell.position(spell_data.firewall.spell_id, target_position, spell_data.firewall.data.cast_delay) then
@@ -98,7 +98,7 @@ local function logics(target, target_selector_data)
         local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
         if debug_enabled then
-            console.print("[FIREWALL DEBUG] Cast successful");
+            console.print("[SPELL DEBUG] Firewall - Cast successful");
         end
         return true, cooldown;
     end

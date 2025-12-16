@@ -48,10 +48,10 @@ local function logics(target)
         if debug_enabled then
             console.print("[SPELL DEBUG] Deep Freeze - Cast successful");
         end
-        return true;
+        return true, my_utility.spell_delays.regular_cast;
     end;
 
-    return false;
+    return false, 0;
 end
 
 return

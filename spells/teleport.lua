@@ -85,9 +85,9 @@ local function logics(target)
         if cast_spell.position(spell_id_tp, cursor_position, 0.3) then
             next_time_allowed_cast = get_time_since_inject() + 0.5
             if debug_enabled then console.print("Teleport: Cursor Cast") end
-            return true
+            return true, 0.5
         end
-        return false
+        return false, 0
     end
 
     -- Cast on Self
@@ -95,9 +95,9 @@ local function logics(target)
         if cast_spell.self(spell_id_tp, 0.0) then
             next_time_allowed_cast = get_time_since_inject() + 0.5
             if debug_enabled then console.print("Teleport: Self Cast") end
-            return true
+            return true, 0.5
         end
-        return false
+        return false, 0
     end
 
     -- Priority Target
@@ -108,10 +108,10 @@ local function logics(target)
             if cast_spell.position(spell_id_tp, best_target:get_position(), 0.3) then
                 next_time_allowed_cast = get_time_since_inject() + 0.5
                 if debug_enabled then console.print("Teleport: Priority Cast (" .. type .. ")") end
-                return true
+                return true, 0.5
             end
         end
-        return false
+        return false, 0
     end
 
     -- Default Logic (Min Hits)
@@ -122,12 +122,12 @@ local function logics(target)
              if cast_spell.position(spell_id_tp, target:get_position(), 0.3) then
                 next_time_allowed_cast = get_time_since_inject() + 0.5
                 if debug_enabled then console.print("Teleport: Default Cast (Hits: " .. count .. ")") end
-                return true
+                return true, 0.5
             end
         end
     end
 
-    return false
+    return false, 0
 end
 
 return

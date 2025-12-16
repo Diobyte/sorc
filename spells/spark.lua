@@ -54,7 +54,7 @@ local function logics(target)
         if debug_enabled then
             console.print("[SPARK DEBUG] Target out of range")
         end
-        return false
+        return false, 0
     end
 
     if debug_enabled then
@@ -70,10 +70,10 @@ local function logics(target)
             console.print("[SPARK DEBUG] Spark - Cast successful");
         end
 
-        return true;
+        return true, cooldown;
     end;
 
-    return false;
+    return false, 0;
 end
 
 

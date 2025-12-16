@@ -56,10 +56,10 @@ local function logics(target)
         if debug_enabled then
             console.print("[SPELL DEBUG] Ice Shards - Cast successful");
         end
-        return true;
+        return true, cooldown;
     end;
 
-    return false;
+    return false, 0;
 end
 
 

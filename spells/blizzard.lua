@@ -47,7 +47,7 @@ local function logics(target, target_selector_data)
         if debug_enabled then
             console.print("[BLIZZARD DEBUG] Logic not allowed - spell conditions not met")
         end
-        return false
+        return false, 0
     end;
 
     -- Mana check
@@ -57,7 +57,7 @@ local function logics(target, target_selector_data)
         if debug_enabled then
             console.print("[BLIZZARD DEBUG] Insufficient mana: " .. string.format("%.1f", mana_pct * 100) .. "% < " .. string.format("%.1f", menu_elements.min_mana_percent:get() * 100) .. "%")
         end
-        return false
+        return false, 0
     end
 
     -- Use optimal AoE positioning
@@ -68,7 +68,7 @@ local function logics(target, target_selector_data)
         if debug_enabled then
             console.print("[BLIZZARD DEBUG] Not enough targets in AOE: " .. enemies_in_aoe .. " < " .. menu_elements.min_max_targets:get())
         end
-        return false
+        return false, 0
     end
 
     local cast_pos = my_utility.get_best_point(best_target:get_position(), spell_data.blizzard.data.radius, area_data.victim_list)

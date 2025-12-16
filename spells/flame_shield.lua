@@ -74,7 +74,7 @@ local function logics(target)
             if debug_enabled then
                 console.print("[FLAME SHIELD DEBUG] Belial mode enabled but no buffs detected")
             end
-            return false
+            return false, 0
         end
         -- Delay cast if Belial detected
         local current_time = get_time_since_inject()
@@ -82,7 +82,7 @@ local function logics(target)
             if debug_enabled then
                 console.print("[FLAME SHIELD DEBUG] Delaying cast for Belial breath")
             end
-            return false
+            return false, 0
         end
     end
 

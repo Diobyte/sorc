@@ -61,7 +61,7 @@ local function logics(target)
             if debug_enabled then
                 console.print("[SPEAR DEBUG] Crackling Energy: Not enough Ball casts (" .. my_utility.get_ball_cast_count() .. "/3)")
             end
-            return false
+            return false, 0
         end
         -- Reset after casting Spear
         my_utility.end_crackling_energy_loop()
@@ -76,10 +76,10 @@ local function logics(target)
             console.print("Cast Lightning Spear - Target: " .. my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
 
-        return true;
+        return true, cooldown;
     end
 
-    return false;
+    return false, 0;
 
 end
 

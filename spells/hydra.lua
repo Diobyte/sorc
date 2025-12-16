@@ -50,7 +50,7 @@ local function logics(target)
         if debug_enabled then
             console.print("[SPELL DEBUG] Hydra - Target out of range");
         end
-        return false
+        return false, 0
     end
 
     if debug_enabled then
@@ -63,10 +63,10 @@ local function logics(target)
         if debug_enabled then
             console.print("[SPELL DEBUG] Hydra - Cast successful");
         end
-        return true;
+        return true, my_utility.spell_delays.regular_cast;
     end;
 
-    return false;
+    return false, 0;
 end
 
 return
