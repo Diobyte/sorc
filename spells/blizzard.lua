@@ -1,7 +1,7 @@
 local my_utility = require("my_utility/my_utility")
 local spell_data = require("my_utility/spell_data")
 
-local max_spell_range = 15.0
+local max_spell_range = spell_data.blizzard.data.range
 local targeting_type = "ranged"
 local menu_elements =
 {
@@ -53,7 +53,7 @@ local function logics(target)
         if enemy and enemy:is_enemy() then
             local enemy_pos = enemy:get_position()
             local distance = target_pos:dist_to(enemy_pos)
-            if distance <= 3.0 then -- Blizzard AoE radius
+            if distance <= spell_data.blizzard.data.radius then -- Blizzard AoE radius
                 enemies_in_aoe = enemies_in_aoe + 1
             end
         end

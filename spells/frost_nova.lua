@@ -38,14 +38,14 @@ local function logics(target)
         return false
     end
 
-    local area_data = target_selector.get_most_hits_target_circular_area_heavy(get_player_position(), 3.66, 3.66)
+    local area_data = target_selector.get_most_hits_target_circular_area_heavy(get_player_position(), spell_data.frost_nova.data.radius, spell_data.frost_nova.data.radius)
     local amount_hits = area_data.n_hits
 
     if amount_hits < menu_elements.min_max_targets:get() then
         return false;
     end;
 
-    if cast_spell.self(spell_data.frost_nova.spell_id, 0.15) then
+    if cast_spell.self(spell_data.frost_nova.spell_id, spell_data.frost_nova.data.cast_delay) then
         local cooldown = my_utility.spell_delays.regular_cast
         next_time_allowed_cast = time + cooldown
         return true;

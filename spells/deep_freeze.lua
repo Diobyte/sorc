@@ -29,7 +29,7 @@ local function logics(target)
     if not is_logic_allowed then return false end;
 
     -- Check for minimum enemies in range
-    local enemies_in_range = my_utility.enemy_count_in_range(5.5); -- Deep Freeze radius
+    local enemies_in_range = my_utility.enemy_count_in_range(spell_data.deep_freeze.data.radius); -- Deep Freeze radius
     if enemies_in_range < menu_elements.min_enemies:get() then
         return false;
     end

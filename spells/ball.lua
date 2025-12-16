@@ -8,7 +8,7 @@ local menu_elements =
     tree_tab            = tree_node:new(1),
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "ball_main_boolean")),
     targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "ball_targeting_mode")),
-    min_target_range    = slider_float:new(1.0, 20.0, 5.0, get_hash(my_utility.plugin_label .. "ball_min_target_range"))
+    min_target_range    = slider_float:new(1.0, max_spell_range - 1, 5.0, get_hash(my_utility.plugin_label .. "ball_min_target_range"))
 }
 
 local function menu()

@@ -42,7 +42,7 @@ local function logics(target)
 
     local target_position = target:get_position();
 
-    if cast_spell.position(spell_data.firewall.spell_id, target_position, 0.35) then
+    if cast_spell.position(spell_data.firewall.spell_id, target_position, spell_data.firewall.data.cast_delay) then
         local current_time = get_time_since_inject();
         local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
