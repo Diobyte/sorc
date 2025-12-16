@@ -9,6 +9,7 @@ local menu_elements =
     main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean_lightning_spear")),
     targeting_mode        = combo_box:new(0, get_hash(my_utility.plugin_label .. "lightning_spear_targeting_mode")),
     min_target_range      = slider_float:new(1.0, 20.0, 5.0, get_hash(my_utility.plugin_label .. "lightning_spear_min_target_range")),
+    priority_target       = checkbox:new(false, get_hash(my_utility.plugin_label .. "spear_priority_target")),
     crackling_energy_snapshot = checkbox:new(false, get_hash(my_utility.plugin_label .. "crackling_energy_snapshot_spear")),
     debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "spear_debug_mode"))
 }
@@ -21,6 +22,7 @@ local function menu()
         menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes, "")
         menu_elements.min_target_range:render("Min Target Range", "", 1)
         if menu_elements.main_boolean:get() then
+            menu_elements.priority_target:render("Priority Targeting", "Targets Boss > Champion > Elite > Any")
             menu_elements.crackling_energy_snapshot:render("Crackling Energy Snapshot", "Enables special casting logic for Crackling Energy optimization")
         end
  

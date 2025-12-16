@@ -306,7 +306,7 @@ local angle_table = { false, 90.0 } -- max angle
 
 -- Cache for heavy function results
 local next_target_update_time = 0.0 -- Time of next target evaluation
-local cast_end_time = 0.0          -- Time when casting is allowed again
+local next_cast_time = 0.0          -- Time of next possible cast
 local targeting_refresh_interval = menu_elements.targeting_refresh_interval:get()
 
 -- Default enemy weights for different enemy types
@@ -465,7 +465,7 @@ on_update(function()
     end
 
     local current_time = get_time_since_inject()
-    if current_time < cast_end_time then
+    if current_time < next_cast_time then
         return
     end
 
@@ -631,7 +631,8 @@ on_update(function()
 
         if cast_result then
             local cd = cooldown or my_utility.spell_delays.regular_cast
-            cast_end_time = current_time + cd
+            next_cast_time = current_time + cd
+            my_utility.record_spell_cast(spell_name)
             return true
         end
         return false

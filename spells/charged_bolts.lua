@@ -9,6 +9,8 @@ local menu_elements =
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "charged_bolts_main_bool_base")),
     targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "charged_bolts_targeting_mode")),
     min_target_range    = slider_float:new(1.0, 20.0, 5.0, get_hash(my_utility.plugin_label .. "charged_bolts_min_target_range")),
+    priority_target     = checkbox:new(false, get_hash(my_utility.plugin_label .. "charged_bolts_priority_target")),
+    min_mana_percent    = slider_float:new(0.1, 1.0, 0.1, get_hash(my_utility.plugin_label .. "charged_bolts_min_mana")),
     debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "charged_bolts_debug_mode"))
 }
 
@@ -20,6 +22,8 @@ local function menu()
         if menu_elements.main_boolean:get() then
             menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged, my_utility.targeting_mode_description)
             menu_elements.min_target_range:render("Min Target Range", "", 1)
+            menu_elements.priority_target:render("Priority Targeting", "Targets Boss > Champion > Elite > Any")
+            menu_elements.min_mana_percent:render("Min Mana Percent", "Minimum mana percentage to cast", 1)
         end
  
         menu_elements.tree_tab:pop()
@@ -40,15 +44,25 @@ local function logics(target)
         if debug_enabled then
             console.print("[CHARGED BOLTS DEBUG] Logic not allowed - spell conditions not met")
         end
-        return false;
+        return false, 0
     end;
+
+    -- Mana check
+    local local_player = get_local_player()
+    local mana_pct = local_player:get_primary_resource_current() / local_player:get_primary_resource_max()
+    if mana_pct < menu_elements.min_mana_percent:get() then
+        if debug_enabled then
+            console.print("[CHARGED BOLTS DEBUG] Insufficient mana: " .. string.format("%.1f", mana_pct * 100) .. "%")
+        end
+        return false, 0
+    end
     
     if not target then
         if debug_enabled then
-            console.print("[CHARGED BOLTS DEBUG] No target")
+            console.print("[CHARGED BOLTS DEBUG] No target found")
         end
-        return false;
-    end;
+        return false, 0
+    end
 
     if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
         if debug_enabled then

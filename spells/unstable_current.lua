@@ -8,6 +8,8 @@ local menu_elements =
     tree_tab            = tree_node:new(1),
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "unstable_current_main_bool_base")),
     min_enemies         = slider_int:new(1, 30, 5, get_hash(my_utility.plugin_label .. "unstable_current_min_enemies")),
+    min_mana_percent    = slider_float:new(0.0, 1.0, 0.3,
+        get_hash(my_utility.plugin_label .. "unstable_current_min_mana_percent")),
     debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "unstable_current_debug_mode"))
 }
 
@@ -17,6 +19,7 @@ local function menu()
         menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
         if menu_elements.main_boolean:get() then
             menu_elements.min_enemies:render("Minimum Enemies", "Minimum number of enemies in range to cast")
+            menu_elements.min_mana_percent:render("Min Mana %", "Minimum mana percentage required to cast", 1)
         end
         menu_elements.tree_tab:pop()
     end
@@ -29,6 +32,13 @@ local function logics(target)
     local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(menu_boolean, next_time_allowed_cast, spell_data.unstable_current.spell_id);
     if not is_logic_allowed then return false, 0 end;
+
+    -- Mana check
+    local local_player = get_local_player()
+    local mana_pct = local_player:get_primary_resource_current() / local_player:get_primary_resource_max()
+    if mana_pct < menu_elements.min_mana_percent:get() then
+        return false, 0
+    end
 
     -- Check for minimum enemies in range
     local player_position = get_player_position();

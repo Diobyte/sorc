@@ -10,6 +10,8 @@ local menu_elements =
     targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "fire_bolt_targeting_mode")),
     min_target_range    = slider_float:new(1, max_spell_range - 1, 3,
         get_hash(my_utility.plugin_label .. "fire_bolt_min_target_range")),
+    priority_target     = checkbox:new(false, get_hash(my_utility.plugin_label .. "fire_bolt_priority_target")),
+    min_mana_percent    = slider_float:new(0.1, 1.0, 0.1, get_hash(my_utility.plugin_label .. "fire_bolt_min_mana")),
     debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "fire_bolt_debug_mode"))
 }
 
@@ -22,6 +24,8 @@ local function menu()
                 my_utility.targeting_mode_description)
             menu_elements.min_target_range:render("Min Target Distance",
                 "\n     Must be lower than Max Targeting Range     \n\n", 1)
+            menu_elements.priority_target:render("Priority Targeting", "Targets Boss > Champion > Elite > Any")
+            menu_elements.min_mana_percent:render("Min Mana Percent", "Minimum mana percentage to cast", 1)
         end
 
         menu_elements.tree_tab:pop()
@@ -45,6 +49,16 @@ local function logics(target)
         end
         return false, 0
     end;
+
+    -- Mana check
+    local local_player = get_local_player()
+    local mana_pct = local_player:get_primary_resource_current() / local_player:get_primary_resource_max()
+    if mana_pct < menu_elements.min_mana_percent:get() then
+        if debug_enabled then
+            console.print("[FIRE BOLT DEBUG] Insufficient mana: " .. string.format("%.1f", mana_pct * 100) .. "%")
+        end
+        return false, 0
+    end
 
     if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
         if debug_enabled then
