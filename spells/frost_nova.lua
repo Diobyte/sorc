@@ -6,7 +6,7 @@ local targeting_type = "self"
 local menu_elements = 
 {
     tree_tab           = tree_node:new(1),
-    main_boolean       = checkbox:new(true, get_hash(my_utility.plugin_label .. "frost_nova_main_boolean")),
+    main_boolean       = checkbox:new(true, get_hash(my_utility.plugin_label .. "frost_nova_main_bool_base")),
     min_max_targets    = slider_int:new(1, 10, 3, get_hash(my_utility.plugin_label .. "frost_nova_min_max_targets"))
 }
 
@@ -14,7 +14,9 @@ local function menu()
 
     if menu_elements.tree_tab:push("Frost Nova") then
         menu_elements.main_boolean:render("Enable Spell", "")
-        menu_elements.min_max_targets:render("Min Targets", "", 1)
+        if menu_elements.main_boolean:get() then
+            menu_elements.min_max_targets:render("Min Targets", "", 1)
+        end
 
         menu_elements.tree_tab:pop()
     end
@@ -33,21 +35,20 @@ local function logics(target)
         return false;
     end;
 
-    local time = get_time_since_inject()
-    if  time - next_time_allowed_cast < 0.2 then
-        return false
-    end
-
-    local area_data = target_selector.get_most_hits_target_circular_area_heavy(get_player_position(), spell_data.frost_nova.data.radius, spell_data.frost_nova.data.radius)
-    local amount_hits = area_data.n_hits
-
-    if amount_hits < menu_elements.min_max_targets:get() then
+    local enemies_in_range = my_utility.enemy_count_in_range(spell_data.frost_nova.data.radius)
+    if enemies_in_range < menu_elements.min_max_targets:get() then
         return false;
     end;
 
-    if cast_spell.self(spell_data.frost_nova.spell_id, spell_data.frost_nova.data.cast_delay) then
+    if cast_spell.self(spell_data.frost_nova.spell_id, 0) then
+        local current_time = get_time_since_inject();
         local cooldown = my_utility.spell_delays.regular_cast
-        next_time_allowed_cast = time + cooldown
+        next_time_allowed_cast = current_time + cooldown
+        
+        if _G.__sorc_debug__ then
+            console.print("Cast Frost Nova - Enemies: " .. enemies_in_range);
+        end
+        
         return true;
     end;
 
