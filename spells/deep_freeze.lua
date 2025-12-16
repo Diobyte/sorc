@@ -1,83 +1,55 @@
 local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_deep_freeze = 
+local max_spell_range = 0.0  -- Self-cast AoE
+local targeting_type = "self"
+local menu_elements =
 {
-    tree_tab              = tree_node:new(1),
-    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean_deep_freeze")),
-    debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "deep_freeze_debug_mode")),
-    min_max_targets       = slider_int:new(0, 30, 5, get_hash(my_utility.plugin_label .. "min_max_number_of_targets_for_cast"))
+    tree_tab            = tree_node:new(1),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "deep_freeze_main_bool_base")),
+    min_enemies         = slider_int:new(1, 10, 3, get_hash(my_utility.plugin_label .. "deep_freeze_min_enemies")),
 }
 
 local function menu()
-    
-    if menu_elements_deep_freeze.tree_tab:push("Deep Freeze") then
-        menu_elements_deep_freeze.main_boolean:render("Enable Spell", "")
-        menu_elements_deep_freeze.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
-
-        if menu_elements_deep_freeze.main_boolean:get() then
-            menu_elements_deep_freeze.min_max_targets:render("Min Enemies Around", "Amount of targets to cast the spell")
+    if menu_elements.tree_tab:push("Deep Freeze") then
+        menu_elements.main_boolean:render("Enable Deep Freeze", "AoE stun that freezes enemies in place")
+        if menu_elements.main_boolean:get() then
+            menu_elements.min_enemies:render("Minimum Enemies", "Minimum number of enemies in range to cast")
         end
-
-        menu_elements_deep_freeze.tree_tab:pop()
+        menu_elements.tree_tab:pop()
     end
 end
 
-local next_time_allowed_cast = 0.0;
-local spell_id_deep_freeze = 291827;
-local function logics()
+local next_time_allowed_cast = 0;
 
-    local menu_boolean = menu_elements_deep_freeze.main_boolean:get();
-    local debug_enabled = menu_elements_deep_freeze.debug_mode:get();
-    local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean, 
-                next_time_allowed_cast, 
-                spell_id_deep_freeze);
+local function logics(target)
+    -- Deep Freeze is a self-cast AoE stun - doesn't need a target
+    local menu_boolean = menu_elements.main_boolean:get();
+    local is_logic_allowed = my_utility.is_spell_allowed(menu_boolean, next_time_allowed_cast, spell_data.deep_freeze.spell_id);
+    if not is_logic_allowed then return false end;
 
-    if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[DEEP FREEZE DEBUG] Logic not allowed - spell conditions not met")
-        end
+    -- Check for minimum enemies in range
+    local enemies_in_range = my_utility.enemy_count_in_range(5.5); -- Deep Freeze radius
+    if enemies_in_range < menu_elements.min_enemies:get() then
         return false;
-    end;
-
-    local area_data = target_selector.get_most_hits_target_circular_area_light(get_player_position(), 5.5, 5.5, false)
-    local units = area_data.n_hits
-
-    if debug_enabled then
-        console.print("[DEEP FREEZE DEBUG] Enemies in area: " .. units .. " | Required: " .. menu_elements_deep_freeze.min_max_targets:get())
     end
 
-    if units < menu_elements_deep_freeze.min_max_targets:get() then
-        if debug_enabled then
-            console.print("[DEEP FREEZE DEBUG] Not enough enemies - not casting")
-        end
-        return false;
-    end;
-
-    if debug_enabled then
-        console.print("[DEEP FREEZE DEBUG] Attempting cast")
-    end
-
-    if cast_spell.self(spell_id_deep_freeze, 0.0) then
-        
+    if cast_spell.self(spell_data.deep_freeze.spell_id, 0) then
         local current_time = get_time_since_inject();
-        local cooldown = 4.0;
-        next_time_allowed_cast = current_time + cooldown;
-        
-        if debug_enabled then
-            console.print("[DEEP FREEZE DEBUG] Cast successful")
+        next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
+        if _G.__sorc_debug__ then
+            console.print("Cast Deep Freeze - Enemies: " .. enemies_in_range);
         end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[DEEP FREEZE DEBUG] Cast failed")
-    end
     return false;
 end
 
-return 
+return
 {
     menu = menu,
-    logics = logics,   
+    logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = targeting_type
 }

@@ -1,85 +1,60 @@
-local my_utility = require("my_utility/my_utility");
+local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_sorc_base_lightning = 
+local max_spell_range = spell_data.chain_lightning.data.range
+local targeting_type = "ranged"
+local menu_elements = 
 {
     tree_tab              = tree_node:new(1),
-    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean_chain_lightning")),
-    debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "chain_lightning_debug_mode")),
+    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "chain_lightning_main_boolean")),
+    targeting_mode        = combo_box:new(0, get_hash(my_utility.plugin_label .. "chain_lightning_targeting_mode")),
+    min_target_range      = slider_float:new(1.0, 20.0, 5.0, get_hash(my_utility.plugin_label .. "chain_lightning_min_target_range"))
 }
 
 local function menu()
     
-    if menu_elements_sorc_base_lightning.tree_tab:push("Chain Lightning") then
-        menu_elements_sorc_base_lightning.main_boolean:render("Enable Spell", "")
-        menu_elements_sorc_base_lightning.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
+    if menu_elements.tree_tab:push("Chain Lightning") then
+        menu_elements.main_boolean:render("Enable Spell", "")
+        menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes, "")
+        menu_elements.min_target_range:render("Min Target Range", "", 1)
 
-        menu_elements_sorc_base_lightning.tree_tab:pop()
+        menu_elements.tree_tab:pop()
     end 
 end
 
-local spell_id_chain_lightning = 292757
-local chain_lightning_spell_data = spell_data:new(
-    0.5,                        -- radius
-    11.0,                       -- range
-    2.0,                        -- cast_delay
-    4.0,                        -- projectile_speed
-    true,                       -- has_collision
-    spell_id_chain_lightning,   -- spell_id
-    spell_geometry.rectangular, -- geometry_type
-    targeting_type.skillshot    -- targeting_type
-)
-local local_player = get_local_player();
-if local_player == nil then
-    return
-end
 local next_time_allowed_cast = 0.0;
-local function logics(best_target, target_selector_data)
+local function logics(target)
     
-    local menu_boolean = menu_elements_sorc_base_lightning.main_boolean:get();
-    local debug_enabled = menu_elements_sorc_base_lightning.debug_mode:get();
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
                 menu_boolean, 
-                next_time_allowed_cast,
-                spell_id_chain_lightning);
+                next_time_allowed_cast, 
+                spell_data.chain_lightning.spell_id);
 
     if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[CHAIN LIGHTNING DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
+        return false;
+    end;
+    
+    if not target then
+        return false;
     end;
 
-    if not best_target then
-        if debug_enabled then
-            console.print("[CHAIN LIGHTNING DEBUG] No target provided")
-        end
-        return false, 0;
-    end;
-
-    if debug_enabled then
-        console.print("[CHAIN LIGHTNING DEBUG] Attempting cast on target")
-    end
-
-    if cast_spell.target(best_target, spell_id_chain_lightning, 0.4, false) then
+    if cast_spell.target(target, spell_data.chain_lightning.spell_id, 0.4, false) then
 
         local current_time = get_time_since_inject();
-        local cooldown = 0.8;
+        local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
 
-        if debug_enabled then
-            console.print("[CHAIN LIGHTNING DEBUG] Cast successful")
-        end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[CHAIN LIGHTNING DEBUG] Cast failed")
-    end
-    return false, 0;
+    return false;
 end
 
 return
 {
     menu = menu,
     logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = "ranged"
 }

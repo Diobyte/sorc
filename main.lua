@@ -6,14 +6,93 @@ end
 local character_id = local_player:get_character_class_id();
 local is_sorc = character_id == 0;
 if not is_sorc then
- return
+    return
 end;
 
-local menu = require("menu");
-local spell_priority = require("spell_priority");
+-- Get character level for leveling priorities
+local function get_character_level()
+    return local_player:get_level() or 50;  -- Default to 50 if level not available
+end
+
+-- orbwalker settings
+orbwalker.set_block_movement(true);
+orbwalker.set_clear_toggle(true);
+
+local my_target_selector = require("my_utility/my_target_selector");
+local my_utility = require("my_utility/my_utility");
 local spell_data = require("my_utility/spell_data");
+local get_spell_priority = require("spell_priority");
 local logger = require("my_utility/logger");
-local buff_cache = require("my_utility/buff_cache");
+
+local current_spell_priority = get_spell_priority(0, get_character_level());  -- Include level for leveling priorities
+
+local menu_elements =
+{
+    main_boolean                   = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean")),
+    build_selection                = combo_box:new(0, get_hash(my_utility.plugin_label .. "build_selection")),
+    -- first parameter is the default state, second one the menu element's ID. The ID must be unique,
+    -- not only from within the plugin but also it needs to be unique between demo menu elements and
+    -- other scripts menu elements. This is why we concatenate the plugin name ("LUA_EXAMPLE_NECROMANCER")
+    -- with the menu element name itself.
+
+    main_tree                      = tree_node:new(0),
+
+    -- trees are the menu tabs. The parameter that we pass is the depth of the node. (0 for main menu (bright red rectangle),
+    -- 1 for sub-menu of depth 1 (circular red rectangle with white background) and so on)
+    settings_tree                  = tree_node:new(1),
+    enemy_count_threshold          = slider_int:new(1, 10, 1,
+        get_hash(my_utility.plugin_label .. "enemy_count_threshold")),
+    max_targeting_range            = slider_int:new(1, 30, 12, get_hash(my_utility.plugin_label .. "max_targeting_range")),
+    cursor_targeting_radius        = slider_float:new(0.1, 6, 3,
+        get_hash(my_utility.plugin_label .. "cursor_targeting_radius")),
+    cursor_targeting_angle         = slider_int:new(20, 50, 30,
+        get_hash(my_utility.plugin_label .. "cursor_targeting_angle")),
+    best_target_evaluation_radius  = slider_float:new(0.1, 6, 1.5,
+        get_hash(my_utility.plugin_label .. "best_target_evaluation_radius")),
+    targeting_refresh_interval     = slider_float:new(0.1, 1.0, 0.2,
+        get_hash(my_utility.plugin_label .. "targeting_refresh_interval")),
+
+    enemy_weights_tree             = tree_node:new(1),
+    custom_enemy_weights_tree      = tree_node:new(2),
+    enemy_weight_normal            = slider_int:new(1, 100, 2,
+        get_hash(my_utility.plugin_label .. "enemy_weight_normal")),
+    enemy_weight_elite             = slider_int:new(1, 100, 10,
+        get_hash(my_utility.plugin_label .. "enemy_weight_elite")),
+    enemy_weight_champion          = slider_int:new(1, 100, 15,
+        get_hash(my_utility.plugin_label .. "enemy_weight_champion")),
+    enemy_weight_boss              = slider_int:new(1, 100, 50,
+        get_hash(my_utility.plugin_label .. "enemy_weight_boss")),
+    enemy_weight_damage_resistance = slider_int:new(1, 100, 25,
+        get_hash(my_utility.plugin_label .. "enemy_weight_damage_resistance")),
+
+    debug_tree                     = tree_node:new(1),
+    enable_debug                   = checkbox:new(false, get_hash(my_utility.plugin_label .. "enable_debug")),
+    file_logging_enabled           = checkbox:new(false, get_hash(my_utility.plugin_label .. "file_logging_enabled")),
+    draw_targets                   = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_targets")),
+    draw_max_range                 = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_max_range")),
+    draw_melee_range               = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_melee_range")),
+    draw_cursor_target             = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_cursor_target")),
+    draw_enemy_circles             = checkbox:new(false, get_hash(my_utility.plugin_label .. "draw_enemy_circles")),
+
+    spells_tree                    = tree_node:new(1),
+    disabled_spells_tree           = tree_node:new(1),
+}
+
+local draw_targets_description =
+    "\n     Targets in sight:\n" ..
+    "     Ranged Target - RED circle with line     \n" ..
+    "     Melee Target - GREEN circle with line     \n" ..
+    "     Closest Target - CYAN circle with line     \n\n" ..
+    "     Targets out of sight (only if they are not the same as targets in sight):\n" ..
+    "     Ranged Target - faded RED circle     \n" ..
+    "     Melee Target - faded GREEN circle     \n" ..
+    "     Closest Target - faded CYAN circle     \n\n" ..
+    "     Best Target Evaluation Radius:\n" ..
+    "     faded WHITE circle       \n\n"
+
+local cursor_target_description =
+    "\n     Best Cursor Target - ORANGE pentagon     \n" ..
+    "     Closest Cursor Target - GREEN pentagon     \n\n"
 
 local spells =
 {
@@ -38,723 +117,529 @@ local spells =
     incinerate              = require("spells/incinerate"),
     inferno                 = require("spells/inferno"),
     meteor                  = require("spells/meteor"),
-    spear                   = require("spells/spear"),
     spark                   = require("spells/spark"),
+    spear                   = require("spells/spear"),
     teleport                = require("spells/teleport"),
     teleport_ench           = require("spells/teleport_ench"),
     unstable_current        = require("spells/unstable_current")
 }
 
-on_render_menu (function ()
-
-    if not menu.main_tree:push("Sorcerer: Salad Edition") then
+on_render_menu(function()
+    if not menu_elements.main_tree:push("Sorcerer [Dirty] v1.0.4") then
         return;
     end;
 
-    menu.main_boolean:render("Enable Plugin", "");
+    menu_elements.main_boolean:render("Enable Plugin", "");
 
+    menu_elements.build_selection:render("Build Selection",
+        "Select your preferred build specialization (Season 11 Meta)",
+        {"Default", "Ball Lightning (META)", "Fire Build", "Frost Build", "Chain Lightning"});
 
-    if menu.main_boolean:get() == false then
-        menu.main_tree:pop();
+    -- Update spell priority based on selected build and character level
+    current_spell_priority = get_spell_priority(menu_elements.build_selection:get(), get_character_level());
+
+    if not menu_elements.main_boolean:get() then
+        -- plugin not enabled, stop rendering menu elements
+        menu_elements.main_tree:pop();
         return;
     end;
-    
-    menu.main_debug_enabled:render("Main Debug Mode", "Enable for high-verbosity console logging from the main loop")
-    _G.__sorc_debug__ = menu.main_debug_enabled:get()
-    
-    -- Get equipped spells
+
+    if menu_elements.settings_tree:push("Settings") then
+        menu_elements.enemy_count_threshold:render("Minimum Enemy Count",
+            "       Minimum number of enemies in Enemy Evaluation Radius to consider them for targeting")
+        menu_elements.targeting_refresh_interval:render("Targeting Refresh Interval",
+            "       Time between target checks in seconds       ", 1)
+        menu_elements.max_targeting_range:render("Max Targeting Range",
+            "       Maximum range for targeting       ")
+        menu_elements.cursor_targeting_radius:render("Cursor Targeting Radius",
+            "       Area size for selecting target around the cursor       ", 1)
+        menu_elements.cursor_targeting_angle:render("Cursor Targeting Angle",
+            "       Maximum angle between cursor and target to cast targetted spells       ")
+        menu_elements.best_target_evaluation_radius:render("Enemy Evaluation Radius",
+            "       Area size around an enemy to evaluate if it's the best target       \n" ..
+            "       If you use huge aoe spells, you should increase this value       \n" ..
+            "       Size is displayed with debug/display targets with faded white circles       ", 1)
+
+        if menu_elements.enemy_weights_tree:push("Enemy Weights") then
+            menu_elements.enemy_weight_normal:render("Normal Enemy Weight",
+                "Weighing score for normal enemies - default is 2")
+            menu_elements.enemy_weight_elite:render("Elite Enemy Weight",
+                "Weighing score for elite enemies - default is 10")
+            menu_elements.enemy_weight_champion:render("Champion Enemy Weight",
+                "Weighing score for champion enemies - default is 15")
+            menu_elements.enemy_weight_boss:render("Boss Enemy Weight",
+                "Weighing score for boss enemies - default is 50")
+            menu_elements.enemy_weight_damage_resistance:render("Damage Resistance Aura Enemy Weight",
+                "Weighing score for enemies with damage resistance aura - default is 25")
+            menu_elements.enemy_weights_tree:pop()
+        end
+
+        menu_elements.enable_debug:render("Enable Debug", "")
+        menu_elements.file_logging_enabled:render("Enable File Logging", 
+            "Log debug information to a file on disk")
+        if menu_elements.enable_debug:get() then
+            if menu_elements.debug_tree:push("Debug") then
+                menu_elements.draw_targets:render("Display Targets", draw_targets_description)
+                menu_elements.draw_max_range:render("Display Max Range",
+                    "Draw max range circle")
+                menu_elements.draw_melee_range:render("Display Melee Range",
+                    "Draw melee range circle")
+                menu_elements.draw_cursor_target:render("Display Cursor Target", cursor_target_description)
+                menu_elements.draw_enemy_circles:render("Display Enemy Circles",
+                    "Draw enemy circles")
+                menu_elements.debug_tree:pop()
+            end
+        end
+
+        menu_elements.settings_tree:pop()
+    end
+
     local equipped_spells = get_equipped_spell_ids()
-    table.insert(equipped_spells, spell_data.evade.spell_id) -- add evade to the list
-    
-    -- Check for teleport_ench buff (buff_id 516547)
-    local has_teleport_ench_buff = false
-    local player_buffs = buff_cache.get_buffs(local_player)
-    if player_buffs then
-        for _, buff in ipairs(player_buffs) do
-            if buff.name_hash == 516547 then
-                has_teleport_ench_buff = true
+
+    -- Create a lookup table for equipped spells
+    local equipped_lookup = {}
+    for _, spell_id in ipairs(equipped_spells) do
+        -- Check each spell in spell_data to find matching spell_id
+        for spell_name, data in pairs(spell_data) do
+            if data.spell_id == spell_id then
+                equipped_lookup[spell_name] = true
                 break
             end
         end
     end
-    
-    -- If teleport_ench buff is detected, add it to equipped spells
-    if has_teleport_ench_buff then
-        table.insert(equipped_spells, spell_data.teleport_ench.spell_id)
-    end
-    
-    -- Create a lookup table for equipped spells
-    local equipped_lookup = {}
-    for _, spell_id in ipairs(equipped_spells) do
-        equipped_lookup[spell_id] = true
-    end
-    
-    -- File Logging System
-    menu.file_logging_enabled:render("File Logging", "Enable to log debug information to timestamped files")
-    
-    -- Weighted Targeting System menu
-    if menu.weighted_targeting_tree:push("Weighted Targeting System") then
-        menu.weighted_targeting_debug:render("Debug Mode", "Enable high-verbosity console logging for weighted targeting decisions")
-        menu.weighted_targeting_enabled:render("Enable Weighted Targeting", "Enables the weighted targeting system that prioritizes targets based on type and proximity")
-        
-        -- Only show configuration if weighted targeting is enabled
-        if menu.weighted_targeting_enabled:get() then
-            -- Scan settings
-            menu.scan_radius:render("Scan Radius", "Radius around character to scan for targets (1-30)")
-            menu.scan_refresh_rate:render("Refresh Rate", "How often to refresh target scanning in seconds (0.1-1.0)", 1) -- Add rounding parameter for float slider
-            menu.min_targets:render("Minimum Targets", "Minimum number of targets required to activate weighted targeting (1-10)")
-            menu.comparison_radius:render("Comparison Radius", "Radius to check for nearby targets when calculating weights (0.1-6.0)", 1) -- Add rounding parameter for float slider
-            
-            -- Custom Enemy Sliders toggle
-            menu.custom_enemy_sliders_enabled:render("Custom Enemy Sliders", "Enable to customize target counts and weights for different enemy types")
-            
-            -- Only show sliders if custom enemy sliders are enabled
-            if menu.custom_enemy_sliders_enabled:get() then
-                -- Normal Enemy
-                menu.normal_target_count:render("Normal Target Count", "Target count value for normal enemies (1-10)")
-                menu.any_weight:render("Normal Weight", "Weight assigned to normal targets (1-100)")
-                
-                -- Elite Enemy
-                menu.elite_target_count:render("Elite Target Count", "Target count value for elite enemies (1-10)")
-                menu.elite_weight:render("Elite Weight", "Weight assigned to elite targets (1-100)")
-                
-                -- Champion Enemy
-                menu.champion_target_count:render("Champion Target Count", "Target count value for champion enemies (1-10)")
-                menu.champion_weight:render("Champion Weight", "Weight assigned to champion targets (1-100)")
-                
-                -- Boss Enemy
-                menu.boss_target_count:render("Boss Target Count", "Target count value for boss enemies (1-10)")
-                menu.boss_weight:render("Boss Weight", "Weight assigned to boss targets (1-100)")
-            end
-            -- Custom Buff Weights section
-            menu.custom_buff_weights_enabled:render("Custom Buff Weights", "Enable to customize weights for special buff-related targets")
-            if menu.custom_buff_weights_enabled:get() then
-                menu.damage_resistance_provider_weight:render("Damage Resistance Provider Bonus", "Weight bonus for enemies providing damage resistance aura (1-100)")
-                menu.damage_resistance_receiver_penalty:render("Damage Resistance Receiver Penalty", "Weight penalty for enemies receiving damage resistance (0-20)")
-                menu.horde_objective_weight:render("Horde Objective Bonus", "Weight bonus for infernal horde objective targets (1-100)")
-                menu.vulnerable_debuff_weight:render("Vulnerable Debuff Bonus", "Weight bonus for targets with VulnerableDebuff (1-5)")
-            end
-        end
-        
-        menu.weighted_targeting_tree:pop()
-    end;
-    
-    -- Populate the equipped_lookup table with equipped spell IDs
-    for _, spell_id in ipairs(equipped_spells) do
-        equipped_lookup[spell_id] = true
-    end
-    
-    -- Active spells menu (spells that are currently equipped)
-    if menu.active_spells_tree:push("Active Spells") then
-        -- Master toggle for cursor teleport, placed within the Active Spells tree
-        menu.enable_cursor_teleport:render("Enable Cursor Teleport", "Master toggle for both Teleport and Teleport Enchantment.")
-        
-        local cursor_teleport_enabled = menu.enable_cursor_teleport:get()
-        
-        -- Sync with Teleport spell
-        if spells.teleport.menu_elements_sorc_base then
-            spells.teleport.menu_elements_sorc_base.cast_at_cursor:set(cursor_teleport_enabled)
-        end
-        
-        -- Sync with Teleport Enchantment spell
-        if spells.teleport_ench.menu_elements_teleport_ench then
-            spells.teleport_ench.menu_elements_teleport_ench.cast_at_cursor:set(cursor_teleport_enabled)
-        end
 
-        -- Iterate through spell_priority to maintain the defined order
-        for _, spell_name in ipairs(spell_priority) do
-            -- Check if the spell exists in spells table, spell_data, and if it's equipped
-            if spells[spell_name] and spell_data[spell_name] and spell_data[spell_name].spell_id and equipped_lookup[spell_data[spell_name].spell_id] then
-                spells[spell_name].menu()
+    if menu_elements.spells_tree:push("Equipped Spells") then
+        -- Display spells in priority order, but only if they're equipped
+        for _, spell_name in ipairs(current_spell_priority) do
+            if equipped_lookup[spell_name] then
+                local spell = spells[spell_name]
+                if spell then
+                    spell.menu()
+                end
             end
         end
-        menu.active_spells_tree:pop()
+        menu_elements.spells_tree:pop()
     end
-    
-    -- Inactive spells menu (spells that are not currently equipped)
-    if menu.inactive_spells_tree:push("Inactive Spells") then
-        -- Iterate through spell_priority to maintain the defined order
-        for _, spell_name in ipairs(spell_priority) do
-            -- Check if the spell exists in spells table, spell_data, and if it's not equipped
-            if spells[spell_name] and spell_data[spell_name] and spell_data[spell_name].spell_id and not equipped_lookup[spell_data[spell_name].spell_id] then
-                spells[spell_name].menu()
+
+    if menu_elements.disabled_spells_tree:push("Inactive Spells") then
+        for _, spell_name in ipairs(current_spell_priority) do
+            local spell = spells[spell_name]
+            if spell and (not equipped_lookup[spell_name] or not spell.menu_elements.main_boolean:get()) then
+                spell.menu()
             end
         end
-        menu.inactive_spells_tree:pop()
-    end;
-    
-    menu.main_tree:pop();
-    
+        menu_elements.disabled_spells_tree:pop()
+    end
+
+    menu_elements.main_tree:pop();
 end)
 
-local can_move = 0.0;
-local cast_end_time = 0.0;
+-- Initialize logger if file logging is enabled
+if menu_elements.file_logging_enabled:get() and not logger.is_ready() then
+    logger.init()
+elseif not menu_elements.file_logging_enabled:get() and logger.is_ready() then
+    logger.close()
+end
 
-local mount_buff_name = "Generic_SetCannotBeAddedToAITargetList";
-local mount_buff_name_hash = mount_buff_name;
-local mount_buff_name_hash_c = 1923;
+-- Set global debug flag based on menu setting
+_G.__sorc_debug__ = menu_elements.enable_debug:get()
 
-local my_utility = require("my_utility/my_utility");
-local my_target_selector = require("my_utility/my_target_selector");
+-- Targets
+local best_ranged_target = nil
+local best_ranged_target_visible = nil
+local best_melee_target = nil
+local best_melee_target_visible = nil
+local closest_target = nil
+local closest_target_visible = nil
+local best_cursor_target = nil
+local closest_cursor_target = nil
+local closest_cursor_target_angle = 0
+-- Targetting scores
+local ranged_max_score = 0
+local ranged_max_score_visible = 0
+local melee_max_score = 0
+local melee_max_score_visible = 0
+local cursor_max_score = 0
 
-on_update(function ()
+-- Targetting settings
+local max_targeting_range = menu_elements.max_targeting_range:get()
+local collision_table = { true, 1 } -- collision width
+local floor_table = { true, 5.0 }   -- floor height
+local angle_table = { false, 90.0 } -- max angle
 
-    local local_player = get_local_player();
-    if not local_player then
-        return;
+-- Cache for heavy function results
+local next_target_update_time = 0.0 -- Time of next target evaluation
+local next_cast_time = 0.0          -- Time of next possible cast
+local targeting_refresh_interval = menu_elements.targeting_refresh_interval:get()
+
+-- Default enemy weights for different enemy types
+local normal_monster_value = 2
+local elite_value = 10
+local champion_value = 15
+local boss_value = 50
+local damage_resistance_value = 25
+
+local target_selector_data_all = nil
+
+local function evaluate_targets(target_list, melee_range)
+    local best_ranged_target = nil
+    local best_melee_target = nil
+    local best_cursor_target = nil
+    local closest_cursor_target = nil
+    local closest_cursor_target_angle = 0
+    local ranged_max_score = 0
+    local ranged_max_score_visible = 0
+    local melee_max_score = 0
+    local melee_max_score_visible = 0
+    local cursor_max_score = 0
+
+    for _, target in ipairs(target_list) do
+        if target:is_enemy() and target:is_alive() then
+            local target_position = target:get_position()
+            local player_position = get_player_position()
+            local distance_sqr = player_position:squared_dist_to_ignore_z(target_position)
+            local distance = math.sqrt(distance_sqr)
+
+            -- Skip if out of max range
+            if distance > max_targeting_range then
+                goto continue
+            end
+
+            -- Calculate score based on enemy type and distance
+            local enemy_score = 0
+            if target:is_boss() then
+                enemy_score = menu_elements.enemy_weight_boss:get()
+            elseif target:is_champion() then
+                enemy_score = menu_elements.enemy_weight_champion:get()
+            elseif target:is_elite() then
+                enemy_score = menu_elements.enemy_weight_elite:get()
+            else
+                enemy_score = menu_elements.enemy_weight_normal:get()
+            end
+
+            -- Check for damage resistance aura
+            local buffs = buff_cache.get_buffs(target)
+            for _, buff in ipairs(buffs or {}) do
+                if buff.name_hash == spell_data.enemies.damage_resistance.spell_id then
+                    if buff.type == spell_data.enemies.damage_resistance.buff_ids.receiver then
+                        enemy_score = enemy_score + menu_elements.enemy_weight_damage_resistance:get()
+                        break
+                    end
+                end
+            end
+
+            -- Distance factor (closer = higher score)
+            local distance_factor = 1.0 / (1.0 + distance * 0.1)
+            enemy_score = enemy_score * distance_factor
+
+            -- Enemy count in evaluation radius
+            local enemy_count_in_radius = my_utility.enemy_count_in_range(target_position,
+                menu_elements.best_target_evaluation_radius:get())
+            enemy_score = enemy_score * (1.0 + enemy_count_in_radius * 0.1)
+
+            -- Visibility
+            local is_visible = target:is_visible()
+            local is_in_line_of_sight = utility.is_in_line_of_sight(player_position, target_position, collision_table,
+                floor_table, angle_table)
+
+            -- Ranged targeting
+            if distance <= max_targeting_range then
+                if is_visible and is_in_line_of_sight then
+                    if enemy_score > ranged_max_score_visible then
+                        ranged_max_score_visible = enemy_score
+                        best_ranged_target_visible = target
+                    end
+                end
+                if enemy_score > ranged_max_score then
+                    ranged_max_score = enemy_score
+                    best_ranged_target = target
+                end
+            end
+
+            -- Melee targeting
+            if distance <= melee_range then
+                if is_visible and is_in_line_of_sight then
+                    if enemy_score > melee_max_score_visible then
+                        melee_max_score_visible = enemy_score
+                        best_melee_target_visible = target
+                    end
+                end
+                if enemy_score > melee_max_score then
+                    melee_max_score = enemy_score
+                    best_melee_target = target
+                end
+            end
+
+            -- Cursor targeting
+            local cursor_position = graphics.get_cursor_world_position()
+            local cursor_distance_sqr = cursor_position:squared_dist_to_ignore_z(target_position)
+            local cursor_distance = math.sqrt(cursor_distance_sqr)
+            if cursor_distance <= menu_elements.cursor_targeting_radius:get() then
+                local cursor_angle = math.abs(math.atan2(cursor_position:y() - player_position:y(),
+                    cursor_position:x() - player_position:x()) -
+                    math.atan2(target_position:y() - player_position:y(),
+                        target_position:x() - player_position:x()))
+                cursor_angle = math.min(cursor_angle, 2 * math.pi - cursor_angle)
+                cursor_angle = cursor_angle * 180 / math.pi -- Convert to degrees
+
+                if cursor_angle <= menu_elements.cursor_targeting_angle:get() then
+                    if enemy_score > cursor_max_score then
+                        cursor_max_score = enemy_score
+                        best_cursor_target = target
+                    end
+                end
+
+                -- Closest cursor target
+                if closest_cursor_target == nil or cursor_distance < closest_cursor_target_distance then
+                    closest_cursor_target = target
+                    closest_cursor_target_distance = cursor_distance
+                    closest_cursor_target_angle = cursor_angle
+                end
+            end
+
+            ::continue::
+        end
     end
-    
-    if menu.main_boolean:get() == false then
-        -- if plugin is disabled dont do any logic
-        return;
-    end;
 
-    -- Allow spell casting regardless of orbwalker mode if desired
-    _G.__sorc_allow_any_orb_mode__ = true
+    return best_ranged_target, best_ranged_target_visible, best_melee_target, best_melee_target_visible,
+        best_cursor_target, closest_cursor_target, closest_cursor_target_angle,
+        ranged_max_score, ranged_max_score_visible, melee_max_score, melee_max_score_visible, cursor_max_score
+end
 
-    -- File logging management
-    if menu.file_logging_enabled:get() then
-        if not logger.is_ready() then
-            logger.init()
-        end
-    else
-        if logger.is_ready() then
-            logger.close()
-        end
+on_update(function()
+    if not menu_elements.main_boolean:get() then
+        return
     end
 
     local current_time = get_time_since_inject()
-    if current_time < cast_end_time then
-        -- Optional console debug is commented; avoid referencing undefined locals
-        -- local debug_msg = "[MAIN DEBUG] Skipping spell casting - cast_end_time active for " .. string.format("%.2f", cast_end_time - current_time) .. "s"
-        -- if logger.is_ready() then logger.log(debug_msg) end
-        return;
-    end;
-
-    if not my_utility.is_action_allowed() then
-        return;
-    end  
-
-    -- Removed undefined buff checks (blood mist) that don't apply to Sorcerer
-
-    local screen_range = 12.0;
-    local player_position = get_player_position();
-
-    local collision_table = { true, 1.0 };
-    local floor_table = { true, 5.0 };
-    local angle_table = { false, 90.0 };
-
-    local entity_list = my_target_selector.get_target_list(
-        player_position,
-        screen_range, 
-        collision_table, 
-        floor_table, 
-        angle_table);
-
-    local target_selector_data = my_target_selector.get_target_selector_data(
-        player_position, 
-        entity_list);
-
-    -- Keep logic simple; avoid referencing undefined variables
-
-
-    if not target_selector_data.is_valid then
-        return;
+    if current_time < next_cast_time then
+        return
     end
 
-    local is_auto_play_active = auto_play.is_active();
-    local max_range = 12.0;
-    if is_auto_play_active then
-        max_range = 12.0;
+    -- Update targeting if needed
+    if current_time >= next_target_update_time then
+        local enemies = actors_manager.get_enemy_npcs()
+        local melee_range = my_utility.get_melee_range()
+        best_ranged_target, best_ranged_target_visible, best_melee_target, best_melee_target_visible,
+        best_cursor_target, closest_cursor_target, closest_cursor_target_angle,
+        ranged_max_score, ranged_max_score_visible, melee_max_score, melee_max_score_visible, cursor_max_score = evaluate_targets(enemies, melee_range)
+
+        next_target_update_time = current_time + targeting_refresh_interval
     end
 
-    -- Default target selection (used if weighted targeting is disabled or no weighted target found)
-    local best_target = target_selector_data.closest_unit;
-
-    -- Apply weighted targeting if enabled
-    if menu.weighted_targeting_enabled:get() then
-        -- Get configuration values
-        local scan_radius = menu.scan_radius:get()
-        local refresh_rate = menu.scan_refresh_rate:get()
-        local min_targets = menu.min_targets:get()
-        local comparison_radius = menu.comparison_radius:get()
-        
-        -- Use either custom weights or default weights based on toggle
-        local boss_weight, elite_weight, champion_weight, any_weight
-        local damage_resistance_provider_weight, damage_resistance_receiver_penalty, horde_objective_weight
-        
-        -- Custom Enemy Sliders
-        local normal_target_count, champion_target_count, elite_target_count, boss_target_count
-        if menu.custom_enemy_sliders_enabled:get() then
-            -- Get target count values
-            normal_target_count = menu.normal_target_count:get()
-            champion_target_count = menu.champion_target_count:get()
-            elite_target_count = menu.elite_target_count:get()
-            boss_target_count = menu.boss_target_count:get()
-            
-            -- Get weight values
-            boss_weight = menu.boss_weight:get()
-            elite_weight = menu.elite_weight:get()
-            champion_weight = menu.champion_weight:get()
-            any_weight = menu.any_weight:get()
-        else
-            -- Default target count values
-            normal_target_count = 1
-            champion_target_count = 5
-            elite_target_count = 5
-            boss_target_count = 5
-            
-            -- Default weight values
-            boss_weight = 50
-            elite_weight = 10
-            champion_weight = 15
-            any_weight = 2
-        end
-
-        -- Custom Buff Weights
-        if menu.custom_buff_weights_enabled:get() then
-            damage_resistance_provider_weight = menu.damage_resistance_provider_weight:get()
-            damage_resistance_receiver_penalty = menu.damage_resistance_receiver_penalty:get()
-            horde_objective_weight = menu.horde_objective_weight:get()
-            vulnerable_debuff_weight = menu.vulnerable_debuff_weight:get()
-        else
-            damage_resistance_provider_weight = 30
-            damage_resistance_receiver_penalty = 5
-            horde_objective_weight = 50
-            vulnerable_debuff_weight = 1
-        end
-        
-        -- Get debug setting
-        local debug_enabled = menu.weighted_targeting_debug:get()
-        
-        -- Get weighted target
-        local weighted_target = my_target_selector.get_weighted_target(
-            player_position,
-            scan_radius,
-            min_targets,
-            comparison_radius,
-            boss_weight,
-            elite_weight,
-            champion_weight,
-            any_weight,
-            refresh_rate,
-            damage_resistance_provider_weight,
-            damage_resistance_receiver_penalty,
-            horde_objective_weight,
-            vulnerable_debuff_weight,
-            min_targets,
-            normal_target_count,
-            champion_target_count,
-            elite_target_count,
-            boss_target_count,
-            debug_enabled
-        )
-        
-        -- Only use weighted target if found, no fallback
-        if weighted_target then
-            best_target = weighted_target
-        else
-            -- If no weighted target found, set best_target to nil to prevent casting
-            -- This respects the minimum target count setting
-            best_target = nil
-        end
-    else
-        -- Traditional targeting (if weighted targeting is disabled)
-        if target_selector_data.has_elite then
-            local unit = target_selector_data.closest_elite;
-            local unit_position = unit:get_position();
-            local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position);
-            if distance_sqr < (max_range * max_range) then
-                best_target = unit;
-            end        
-        end
-
-        if target_selector_data.has_boss then
-            local unit = target_selector_data.closest_boss;
-            local unit_position = unit:get_position();
-            local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position);
-            if distance_sqr < (max_range * max_range) then
-                best_target = unit;
-            end
-        end
-
-        if target_selector_data.has_champion then
-            local unit = target_selector_data.closest_champion;
-            local unit_position = unit:get_position();
-            local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position);
-            if distance_sqr < (max_range * max_range) then
-                best_target = unit;
+    -- Find closest target for fallback
+    local player_position = get_player_position()
+    local closest_distance = 999999
+    for _, enemy in ipairs(actors_manager.get_enemy_npcs()) do
+        if enemy:is_enemy() and enemy:is_alive() then
+            local enemy_position = enemy:get_position()
+            local distance_sqr = player_position:squared_dist_to_ignore_z(enemy_position)
+            if distance_sqr < closest_distance then
+                closest_distance = distance_sqr
+                closest_target = enemy
+                closest_target_visible = enemy:is_visible()
             end
         end
     end
 
-    if not best_target then
-        if menu.main_debug_enabled:get() then
-            console.print("[MAIN DEBUG] No best_target available; skipping spell loop")
-        end
-        return;
-    end
-
-
-    local best_target_position = best_target:get_position();
-    local distance_sqr = best_target_position:squared_dist_to_ignore_z(player_position);
-
-    if distance_sqr > (max_range * max_range) then            
-        best_target = target_selector_data.closest_unit;
-        local closer_pos = best_target:get_position();
-        local distance_sqr_2 = closer_pos:squared_dist_to_ignore_z(player_position);
-        if distance_sqr_2 > (max_range * max_range) then
-            return;
-        end
-    end
-
-    local function should_firewall()
-        local actors = actors_manager.get_all_actors()
-        for _, actor in ipairs(actors) do
-            local actor_name = actor:get_skin_name()
-            if actor_name == "Generic_Proxy_firewall" then
-                local actor_position = actor:get_position()
-                local dx = math.abs(best_target_position:x() - actor_position:x())
-                local dy = math.abs(best_target_position:y() - actor_position:y())    
-                if dx <= 2 and dy <= 8 then  -- rectangle width is 2 and height is 8
-                    return false
-                end
-            end
-        end
-        return true
-    end
-    -- spells logics begins:
-    -- if local_player:is_spell_ready(959728) then
-    --     console.print("spell is ready")
-    -- end
-
-    -- if not local_playeris_spell_ready(959728) then
-    --     console.print("spell is not ready")
-    -- end
-
-    -- Normal spell casting logic begins here
-    
-    -- Define spell parameters for consistent argument passing based on spell type
-    local spell_params = {
-        flame_shield = { args = {} }, -- All spells now return cooldown
-        ice_armor = { args = {} },
-        unstable_current = { args = {} },
-        ball = { args = {best_target} },
-        spear = { args = {best_target} },
-        ice_blade = { args = {best_target} },
-        fireball = { args = {best_target}, custom_handler = true },
-        frozen_orb = { args = {best_target} },
-        chain_lightning = { args = {best_target} },
-        blizzard = { args = {best_target} },
-        inferno = { args = {entity_list, target_selector_data, best_target} },
-        firewall = { args = {local_player, best_target}, custom_check = should_firewall },
-        meteor = { args = {best_target} },
-        ice_shards = { args = {best_target, target_selector_data} },
-        charged_bolts = { args = {best_target} },
-        hydra = { args = {best_target, target_selector_data} },
-        arc_lash = { args = {best_target} },
-        incinerate = { args = {best_target} },
-        frost_nova = { args = {} },
-        teleport_ench = { args = {best_target, target_selector_data} },
-        teleport = { args = {entity_list, target_selector_data, best_target} },
-        deep_freeze = { args = {} },
-        fire_bolt = { args = {best_target} },
-        frost_bolt = { args = {best_target} },
-        spark = { args = {best_target} },
-        familiars = { args = {best_target, target_selector_data} }
-    }
-    
-    -- Special handling for fireball because it has a return value
-    local fireball_cast_successful, fireball_cooldown = spells.fireball.logics(best_target, target_selector_data)
-    if fireball_cast_successful then
-        cast_end_time = current_time + fireball_cooldown;
-        return;
-    end;
-    
-    -- Get equipped spells for spell casting logic
-    local equipped_spells = get_equipped_spell_ids()
-    table.insert(equipped_spells, spell_data.evade.spell_id) -- add evade to the list
-    
-    -- Check for teleport_ench buff (buff_id 516547)
-    local has_teleport_ench_buff = false
-    local player_buffs = buff_cache.get_buffs(local_player)
-    if player_buffs then
-        for _, buff in ipairs(player_buffs) do
-            if buff.name_hash == 516547 then
-                has_teleport_ench_buff = true
-                break
-            end
-        end
-    end
-    
-    -- If teleport_ench buff is detected, add it to equipped spells
-    if has_teleport_ench_buff then
-        table.insert(equipped_spells, spell_data.teleport_ench.spell_id)
-    end
-    
-    -- Create a lookup table for equipped spells
-    local equipped_lookup = {}
-    for _, spell_id in ipairs(equipped_spells) do
-        equipped_lookup[spell_id] = true
-    end
-    
-    -- Removed problematic spell loop that bypassed cast_end_time mechanism
-    
-    -- Loop through spells in priority order defined in spell_priority.lua
-    local any_cast = false
-    for _, spell_name in ipairs(spell_priority) do
+    -- Cast spells in priority order
+    for _, spell_name in ipairs(current_spell_priority) do
         local spell = spells[spell_name]
-        -- Only process spells that are equipped
-        if spell and spell_data[spell_name] and spell_data[spell_name].spell_id and equipped_lookup[spell_data[spell_name].spell_id] then
-            local params = spell_params[spell_name]
-            
-            if params then
-                -- Skip spells with custom_handler flag as they're handled separately
-                if not params.custom_handler then
-                    -- Check any custom pre-conditions if defined
-                    local should_cast = true
-                    if params.custom_check ~= nil then
-                        should_cast = params.custom_check()
-                    end
-                    
-                    if should_cast then
-                        -- Call spell's logics function with appropriate arguments
-                        local debug_msg_attempt = "[MAIN DEBUG] Attempting " .. spell_name .. " cast"
-                        if logger.is_ready() then
-                            logger.log(debug_msg_attempt)
-                        end
-                        
-                        local args = params.args or {}
-                        local cast_successful, cooldown
-                        if #args == 0 then
-                            cast_successful, cooldown = spell.logics()
-                        elseif #args == 1 then
-                            cast_successful, cooldown = spell.logics(args[1])
-                        elseif #args == 2 then
-                            cast_successful, cooldown = spell.logics(args[1], args[2])
-                        elseif #args == 3 then
-                            cast_successful, cooldown = spell.logics(args[1], args[2], args[3])
-                        else
-                            -- Limit to first 3 to satisfy strict signatures
-                            cast_successful, cooldown = spell.logics(args[1], args[2], args[3])
-                        end
-                        if cast_successful then
-                            -- All spells now return their actual cooldown duration
-                            cast_end_time = current_time + cooldown
-                            local debug_msg = "[MAIN DEBUG] " .. spell_name .. " cast successful - setting cast_end_time for " .. cooldown .. "s"
-                            if menu.main_debug_enabled:get() then
-                                console.print(debug_msg)
-                            end
-                            if logger.is_ready() then
-                                logger.log(debug_msg)
-                            end
-                            any_cast = true
-                            return
-                        else
-                            local debug_msg_fail = "[MAIN DEBUG] " .. spell_name .. " cast failed"
-                            if logger.is_ready() then
-                                logger.log(debug_msg_fail)
-                            end
-                        end
-                    else
-                        local debug_msg_precond = "[MAIN DEBUG] " .. spell_name .. " pre-conditions not met"
-                        if logger.is_ready() then
-                            logger.log(debug_msg_precond)
-                        end
-                    end
-                else
-                    local debug_msg_custom = "[MAIN DEBUG] " .. spell_name .. " has custom_handler - skipping"
-                    if logger.is_ready() then
-                        logger.log(debug_msg_custom)
-                    end
-                end
+        if not spell then
+            goto continue
+        end
+
+        if not spell.menu_elements.main_boolean:get() then
+            goto continue
+        end
+
+        local target_unit = nil
+        if spell.menu_elements.targeting_mode then
+            local targeting_mode = spell.menu_elements.targeting_mode:get()
+
+            -- Check for specific targeting maps in the spell module
+            if spell.targeting_type == "melee" then
+                -- Map melee modes to global indices
+                local map = {
+                    [0] = 3, -- Melee Target
+                    [1] = 4, -- Melee Target (in sight)
+                    [2] = 5, -- Closest Target
+                    [3] = 6, -- Closest Target (in sight)
+                    [4] = 7, -- Best Cursor Target
+                    [5] = 8  -- Closest Cursor Target
+                }
+                targeting_mode = map[targeting_mode] or 3 -- Default to Melee Target
+            elseif spell.targeting_type == "ranged" then
+                -- Map ranged modes to global indices
+                local map = {
+                    [0] = 1, -- Ranged Target
+                    [1] = 2, -- Ranged Target (in sight)
+                    [2] = 5, -- Closest Target
+                    [3] = 6, -- Closest Target (in sight)
+                    [4] = 7, -- Best Cursor Target
+                    [5] = 8  -- Closest Cursor Target
+                }
+                targeting_mode = map[targeting_mode] or 1 -- Default to Ranged Target
             else
-                local debug_msg_no_params = "[MAIN DEBUG] " .. spell_name .. " has no params defined"
-                if logger.is_ready() then
-                    logger.log(debug_msg_no_params)
-                end
+                -- Default to ranged if no type specified
+                local map = {
+                    [0] = 1, -- Ranged Target
+                    [1] = 2, -- Ranged Target (in sight)
+                    [2] = 5, -- Closest Target
+                    [3] = 6, -- Closest Target (in sight)
+                    [4] = 7, -- Best Cursor Target
+                    [5] = 8  -- Closest Cursor Target
+                }
+                targeting_mode = map[targeting_mode] or 1
             end
-        end
-    end
 
-    if not any_cast and menu.main_debug_enabled:get() then
-        console.print("[MAIN DEBUG] Spell loop completed with no casts (check is_spell_allowed, cooldowns, equipped list)")
-    end
-    
-    -- auto play engage far away monsters
-    local move_timer = get_time_since_inject()
-    if move_timer < can_move then
-        return;
-    end;
-
-    -- auto play engage far away monsters
-    local is_auto_play = my_utility.is_auto_play_enabled();
-    if is_auto_play then
-        local player_position = local_player:get_position();
-        local is_dangerous_evade_position = evade.is_dangerous_position(player_position);
-        if not is_dangerous_evade_position then
-            local closer_target = target_selector.get_target_closer(player_position, 15.0);
-            if closer_target then
-                -- if is_blood_mist then
-                --     local closer_target_position = closer_target:get_position();
-                --     local move_pos = closer_target_position:get_extended(player_position, -5.0);
-                --     if pathfinder.move_to_cpathfinder(move_pos) then
-                --         cast_end_time = current_time + 0.40;
-                --         can_move = move_timer + 1.5;
-                --         --console.print("auto play move_to_cpathfinder - 111")
-                --     end
-                -- else
-                    local closer_target_position = closer_target:get_position();
-                    local move_pos = closer_target_position:get_extended(player_position, 4.0);
-                    if pathfinder.move_to_cpathfinder(move_pos) then
-                        can_move = move_timer + 1.5;
-                        --console.print("auto play move_to_cpathfinder - 222")
-                    end
-                -- end
-                
+            if targeting_mode == 1 then
+                target_unit = best_ranged_target
+            elseif targeting_mode == 2 then
+                target_unit = best_ranged_target_visible
+            elseif targeting_mode == 3 then
+                target_unit = best_melee_target
+            elseif targeting_mode == 4 then
+                target_unit = best_melee_target_visible
+            elseif targeting_mode == 5 then
+                target_unit = closest_target
+            elseif targeting_mode == 6 then
+                target_unit = closest_target_visible
+            elseif targeting_mode == 7 then
+                target_unit = best_cursor_target
+            elseif targeting_mode == 8 then
+                target_unit = closest_cursor_target
             end
+        else
+            -- Spells without targeting mode use ranged target
+            target_unit = best_ranged_target
         end
-    end
 
+        -- Call spell logic
+        if spell.logics(target_unit) then
+            next_cast_time = current_time + my_utility.spell_delays.regular_cast
+            return
+        end
+
+        ::continue::
+    end
 end)
 
-local draw_player_circle = false;
-local draw_enemy_circles = false;
-
-on_render(function ()
-
-    if menu.main_boolean:get() == false then
-        return;
-    end;
-
-    local local_player = get_local_player();
-    if not local_player then
-        return;
+on_render(function()
+    if not menu_elements.main_boolean:get() or not menu_elements.enable_debug:get() then
+        return
     end
 
-    local player_position = local_player:get_position();
-    local player_screen_position = graphics.w2s(player_position);
-    if player_screen_position:is_zero() then
-        return;
+    local player_position = get_player_position()
+    local player_screen_position = graphics.w2s(player_position)
+
+    -- Draw max range
+    max_targeting_range = menu_elements.max_targeting_range:get()
+    if menu_elements.draw_max_range:get() then
+        graphics.circle_3d(player_position, max_targeting_range, color_white(85), 2.5, 144)
     end
 
-    local function count_and_display_buffs()
-        local local_player = get_local_player()
-        local player_position = get_player_position()
-        local player_position_2d = graphics.w2s(player_position)
-        local text_position = vec2.new(player_position_2d.x, player_position_2d.y + 15)
-        local buff_name_check = "Ring_Unique_Sorc_101"
-        if not local_player then return 0 end
-
-        local buffs = local_player:get_buffs()
-        if not buffs then return 0 end
-
-        local buff_stack_count = -1
-
-        for _, buff in ipairs(buffs) do
-            local buff_name = buff:name()
-            if buff_name == buff_name_check then
-                buff_stack_count = buff_stack_count + 1
-            end
-        end
-        return buff_stack_count
+    -- Draw melee range
+    if menu_elements.draw_melee_range:get() then
+        local melee_range = my_utility.get_melee_range()
+        graphics.circle_3d(player_position, melee_range, color_white(85), 2.5, 144)
     end
 
-    local buff_stack_count = count_and_display_buffs()
-
-    if draw_player_circle then
-        graphics.circle_3d(player_position, 8, color_white(85), 3.5, 144)
-        graphics.circle_3d(player_position, 6, color_white(85), 2.5, 144)
-    end    
-
-    if draw_enemy_circles then
+    -- Draw enemy circles
+    if menu_elements.draw_enemy_circles:get() then
         local enemies = actors_manager.get_enemy_npcs()
 
-        for i,obj in ipairs(enemies) do
-        local position = obj:get_position();
-        local distance_sqr = position:squared_dist_to_ignore_z(player_position);
-        local is_close = distance_sqr < (8.0 * 8.0);
-            -- if is_close then
-                graphics.circle_3d(position, 1, color_white(100));
+        for i, obj in ipairs(enemies) do
+            local position = obj:get_position();
+            graphics.circle_3d(position, 1, color_white(100));
 
-                local future_position = prediction.get_future_unit_position(obj, 0.4);
-                graphics.circle_3d(future_position, 0.5, color_yellow(100));
-            -- end;
+            local future_position = prediction.get_future_unit_position(obj, 0.4);
+            graphics.circle_3d(future_position, 0.25, color_yellow(100));
         end;
     end
 
+    -- Draw targets
+    if menu_elements.draw_targets:get() then
+        -- Draw ranged target
+        if best_ranged_target and best_ranged_target:is_enemy() then
+            local best_ranged_target_position = best_ranged_target:get_position();
+            local best_ranged_target_position_2d = graphics.w2s(best_ranged_target_position);
+            local target_evaluation_radius_alpha = 50
+            if best_ranged_target_visible then
+                graphics.line(best_ranged_target_position_2d, player_screen_position, color_red(255), 2.5)
+                graphics.circle_3d(best_ranged_target_position, 0.70, color_red(255), 2.0);
+                graphics.circle_3d(best_ranged_target_position, menu_elements.best_target_evaluation_radius:get(),
+                    color_white(target_evaluation_radius_alpha), 1);
+                local text_position = vec2:new(best_ranged_target_position_2d.x,
+                    best_ranged_target_position_2d.y - 20)
+                graphics.text_2d("RANGED - Score:" .. ranged_max_score, text_position, 12, color_red_pale(255))
+            else
+                graphics.line(best_ranged_target_position_2d, player_screen_position, color_red(100), 2.5)
+                graphics.circle_3d(best_ranged_target_position, 0.70, color_red(100), 2.0);
+                graphics.circle_3d(best_ranged_target_position, menu_elements.best_target_evaluation_radius:get(),
+                    color_white(target_evaluation_radius_alpha), 1);
+                local text_position = vec2:new(best_ranged_target_position_2d.x,
+                    best_ranged_target_position_2d.y - 20)
+                graphics.text_2d("RANGED - Score:" .. ranged_max_score, text_position, 12, color_red_pale(100))
+            end
+        end
 
-    -- glow target -- quick pasted code cba about this game
+        -- Draw visible melee target
+        if best_melee_target_visible and best_melee_target_visible:is_enemy() then
+            local best_melee_target_visible_position = best_melee_target_visible:get_position();
+            local best_melee_target_visible_position_2d = graphics.w2s(best_melee_target_visible_position);
+            graphics.line(best_melee_target_visible_position_2d, player_screen_position, color_green(255), 2.5)
+            graphics.circle_3d(best_melee_target_visible_position, 0.70, color_green(255), 2.0);
+            graphics.circle_3d(best_melee_target_visible_position, menu_elements.best_target_evaluation_radius:get(),
+                color_white(50), 1);
+            local text_position = vec2:new(best_melee_target_visible_position_2d.x,
+                best_melee_target_visible_position_2d.y - 40)
+            graphics.text_2d("MELEE - Score:" .. melee_max_score_visible, text_position, 12, color_green(255))
+        end
 
-    local screen_range = 12.0;
-    local player_position = get_player_position();
-
-    local collision_table = { true, 1.0 };
-    local floor_table = { true, 5.0 };
-    local angle_table = { false, 90.0 };
-
-    local entity_list = my_target_selector.get_target_list(
-        player_position,
-        screen_range, 
-        collision_table, 
-        floor_table, 
-        angle_table);
-
-    local target_selector_data = my_target_selector.get_target_selector_data(
-        player_position, 
-        entity_list);
-
-    if not target_selector_data.is_valid then
-        return;
-    end
-
-    local is_auto_play_active = auto_play.is_active();
-    local max_range = 12.0;
-    if is_auto_play_active then
-        max_range = 12.0;
-    end
-
-    local best_target = target_selector_data.closest_unit;
-
-    if target_selector_data.has_elite then
-        local unit = target_selector_data.closest_elite;
-        local unit_position = unit:get_position();
-        local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position);
-        if distance_sqr < (max_range * max_range) then
-            best_target = unit;
-        end        
-    end
-
-    if target_selector_data.has_boss then
-        local unit = target_selector_data.closest_boss;
-        local unit_position = unit:get_position();
-        local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position);
-        if distance_sqr < (max_range * max_range) then
-            best_target = unit;
+        -- Draw closest target
+        if closest_target and closest_target:is_enemy() then
+            local closest_target_position = closest_target:get_position();
+            local closest_target_position_2d = graphics.w2s(closest_target_position);
+            if closest_target_visible then
+                graphics.line(closest_target_position_2d, player_screen_position, color_cyan(255), 2.5)
+                graphics.circle_3d(closest_target_position, 0.70, color_cyan(255), 2.0);
+                local text_position = vec2:new(closest_target_position_2d.x,
+                    closest_target_position_2d.y - 60)
+                graphics.text_2d("CLOSEST", text_position, 12, color_cyan(255))
+            else
+                graphics.line(closest_target_position_2d, player_screen_position, color_cyan(100), 2.5)
+                graphics.circle_3d(closest_target_position, 0.70, color_cyan(100), 2.0);
+                local text_position = vec2:new(closest_target_position_2d.x,
+                    closest_target_position_2d.y - 60)
+                graphics.text_2d("CLOSEST", text_position, 12, color_cyan(100))
+            end
         end
     end
 
-    if target_selector_data.has_champion then
-        local unit = target_selector_data.closest_champion;
-        local unit_position = unit:get_position();
-        local distance_sqr = unit_position:squared_dist_to_ignore_z(player_position);
-        if distance_sqr < (max_range * max_range) then
-            best_target = unit;
+    -- Draw cursor targets
+    if menu_elements.draw_cursor_target:get() then
+        -- Draw best cursor target
+        if best_cursor_target and best_cursor_target:is_enemy() then
+            local best_cursor_target_position = best_cursor_target:get_position();
+            local best_cursor_target_position_2d = graphics.w2s(best_cursor_target_position);
+            graphics.pentagon_3d(best_cursor_target_position, 0.70, color_orange(255), 2.0);
+            local text_position = vec2:new(best_cursor_target_position_2d.x,
+                best_cursor_target_position_2d.y - 80)
+            graphics.text_2d("BEST_CURSOR_TARGET - Score:" .. cursor_max_score, text_position, 12, color_orange(255))
         end
-    end   
 
-    if not best_target then
-        return;
+        -- Draw closest cursor target
+        if closest_cursor_target and closest_cursor_target:is_enemy() then
+            local closest_cursor_target_position = closest_cursor_target:get_position();
+            local closest_cursor_target_position_2d = graphics.w2s(closest_cursor_target_position);
+            graphics.pentagon_3d(closest_cursor_target_position, 0.70, color_green_pastel(255), 2.0);
+            local text_position = vec2:new(closest_cursor_target_position_2d.x,
+                closest_cursor_target_position_2d.y - 100)
+            graphics.text_2d("CLOSEST_CURSOR_TARGET - Angle:" .. string.format("%.1f", closest_cursor_target_angle),
+                text_position, 12, color_green_pastel(255))
+        end
     end
-
-    if best_target and best_target:is_enemy()  then
-        local glow_target_position = best_target:get_position();
-        local glow_target_position_2d = graphics.w2s(glow_target_position);
-        graphics.line(glow_target_position_2d, player_screen_position, color_red(180), 2.5)
-        graphics.circle_3d(glow_target_position, 0.80, color_red(200), 2.0);
-    end
-
-
 end);
 
-console.print("Lua Plugin - Salad Sorcerer - Version 1.8 (Console cleanup edition)");
+console.print("Lua Plugin - Sorcerer Dirty - Version 1.0.4")

@@ -1,96 +1,61 @@
 local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local frozen_orb_menu_elements =
+local max_spell_range = spell_data.frozen_orb.data.range
+local targeting_type = "ranged"
+local menu_elements =
 {
     tree_tab            = tree_node:new(1),
-    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "spark_main_boolean")),
-    debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "frozen_orb_debug_mode")),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "frozen_orb_main_boolean")),
+    targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "frozen_orb_targeting_mode")),
+    min_target_range    = slider_float:new(1.0, 20.0, 5.0, get_hash(my_utility.plugin_label .. "frozen_orb_min_target_range"))
 }
 
 local function menu()
     
-    if frozen_orb_menu_elements.tree_tab:push("Frozen Orb")then
-        frozen_orb_menu_elements.main_boolean:render("Enable Spell", "")
-        frozen_orb_menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
+    if menu_elements.tree_tab:push("Frozen Orb")then
+        menu_elements.main_boolean:render("Enable Spell", "")
+        menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes, "")
+        menu_elements.min_target_range:render("Min Target Range", "", 1)
  
-        frozen_orb_menu_elements.tree_tab:pop()
+        menu_elements.tree_tab:pop()
     end
 end
 
-local spell_id_fozen_orb = 291347;
-
-local frozen_orb_data = spell_data:new(
-    1.5,                        -- radius
-    2.0,                        -- range
-    1.0,                        -- cast_delay
-    2.5,                        -- projectile_speed
-    false,                      -- has_collision
-    spell_id_fozen_orb,             -- spell_id
-    spell_geometry.circular, -- geometry_type
-    targeting_type.skillshot    --targeting_type
-)
 local next_time_allowed_cast = 0.0;
-local function logics(best_target, target_selector_data)
-
-    local debug_enabled = frozen_orb_menu_elements.debug_mode:get();
-
-    if  utility.is_spell_ready(292074) then
-        if debug_enabled then
-            console.print("[FROZEN ORB DEBUG] Spell 292074 is ready - not casting")
-        end
-        return false, 0;
-    end;
+local function logics(target)
 	
-    local menu_boolean = frozen_orb_menu_elements.main_boolean:get();
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
                 menu_boolean, 
                 next_time_allowed_cast, 
-                spell_id_fozen_orb);
+                spell_data.frozen_orb.spell_id);
 
     if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[FROZEN ORB DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
+        return false;
     end;
-
-    if not best_target then
-        if debug_enabled then
-            console.print("[FROZEN ORB DEBUG] No target provided")
-        end
-        return false, 0;
-    end;
-
-    local player_local = get_local_player();
     
-    local player_position = get_player_position();
-    local target_position = best_target:get_position();
+    if not target then
+        return false;
+    end;
 
-    if debug_enabled then
-        console.print("[FROZEN ORB DEBUG] Attempting cast on target")
-    end
-
-    if cast_spell.target(best_target, frozen_orb_data, false) then
+    if cast_spell.target(target, spell_data.frozen_orb.spell_id, false) then
 
         local current_time = get_time_since_inject();
-        local cooldown = 0.8;
+        local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
 
-        if debug_enabled then
-            console.print("[FROZEN ORB DEBUG] Cast successful")
-        end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[FROZEN ORB DEBUG] Cast failed")
-    end
-    return false, 0;
+    return false;
 end
 
 
 return 
 {
     menu = menu,
-    logics = logics,   
+    logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = "ranged"
 }

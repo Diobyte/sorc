@@ -1,112 +1,64 @@
 local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_fire_bolt =
+local max_spell_range = spell_data.fire_bolt.data.range
+local targeting_type = "ranged"
+local menu_elements =
 {
     tree_tab            = tree_node:new(1),
-    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "test_fire_bolt_main_boolean")),
-    debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "fire_bolt_debug_mode")),
-    jmr_logic        = checkbox:new(true, get_hash(my_utility.plugin_label .. "test_fire_bolt_jmr_logic_boolean")),
-    only_elite_or_boss        = checkbox:new(true, get_hash(my_utility.plugin_label .. "test_fire_bolt_only_elite_or_boss_boolean")),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "fire_bolt_main_bool_base")),
+    targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "fire_bolt_targeting_mode")),
+    min_target_range    = slider_float:new(1, max_spell_range - 1, 3,
+        get_hash(my_utility.plugin_label .. "fire_bolt_min_target_range")),
 }
 
 local function menu()
-    
-    if menu_elements_fire_bolt.tree_tab:push("Fire Bolt")then
-        menu_elements_fire_bolt.main_boolean:render("Enable Spell", "")
-        menu_elements_fire_bolt.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
-        menu_elements_fire_bolt.jmr_logic:render("Enable JMR Logic", "")
-        menu_elements_fire_bolt.only_elite_or_boss:render("Only Elite or Boss", "")
- 
-        menu_elements_fire_bolt.tree_tab:pop()
+    if menu_elements.tree_tab:push("Fire Bolt") then
+        menu_elements.main_boolean:render("Enable Fire Bolt", "")
+        if menu_elements.main_boolean:get() then
+            menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged,
+                my_utility.targeting_mode_description)
+            menu_elements.min_target_range:render("Min Target Distance",
+                "\n     Must be lower than Max Targeting Range     \n\n", 1)
+        end
+
+        menu_elements.tree_tab:pop()
     end
 end
 
-local spell_id_fire_bolt = 153249;
+local next_time_allowed_cast = 0;
 
-local fire_bolt_spell_data = spell_data:new(
-    0.7,                        -- radius
-    20.0,                        -- range
-    0.0,                        -- cast_delay
-    4.0,                        -- projectile_speed
-    true,                      -- has_collision
-    spell_id_fire_bolt,           -- spell_id
-    spell_geometry.rectangular, -- geometry_type
-    targeting_type.skillshot    --targeting_type
-)
-local next_time_allowed_cast = 0.0;
-local function logics(best_target, target_selector_data)
-    
-    local menu_boolean = menu_elements_fire_bolt.main_boolean:get();
-    local debug_enabled = menu_elements_fire_bolt.debug_mode:get();
+local function logics(target)
+    if not target then return false end;
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean, 
-                next_time_allowed_cast, 
-                spell_id_fire_bolt);
+        menu_boolean,
+        next_time_allowed_cast,
+        spell_data.fire_bolt.spell_id);
 
-    if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[FIRE BOLT DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
-    end;
-    
-    if not best_target then
-        if debug_enabled then
-            console.print("[FIRE BOLT DEBUG] No target provided")
-        end
-        return false, 0;
-    end;
+    if not is_logic_allowed then return false end;
 
-    if  menu_elements_fire_bolt.only_elite_or_boss:get() then
-        local is_valid_target = best_target:is_boss() or best_target:is_elite() or best_target:is_champion()
-        
-        if debug_enabled then
-            console.print("[FIRE BOLT DEBUG] Elite/Boss only mode - Target valid: " .. (is_valid_target and "Yes" or "No"))
-        end
-        
-        if not is_valid_target then
-            return false, 0;
-        end
-    end
-    
-    local player_position = get_player_position();
-    local target_position = best_target:get_position();
-    local is_collision = prediction.is_wall_collision(player_position, target_position, 0.2)
-    
-    if debug_enabled then
-        console.print("[FIRE BOLT DEBUG] Wall collision check: " .. (is_collision and "Blocked" or "Clear"))
-    end
-    
-    if is_collision then
-        return false, 0
+    if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
+        return false
     end
 
-    if debug_enabled then
-        console.print("[FIRE BOLT DEBUG] Attempting cast on target")
-    end
-
-    if cast_spell.target(best_target, fire_bolt_spell_data, false) then
-
+    if cast_spell.target(target, spell_data.fire_bolt.spell_id, 0) then
         local current_time = get_time_since_inject();
-        local cooldown = 0.0;
-        next_time_allowed_cast = current_time + cooldown;
-
-        if debug_enabled then
-            console.print("[FIRE BOLT DEBUG] Cast successful")
+        next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
+        if _G.__sorc_debug__ then
+            console.print("Cast Fire Bolt - Target: " ..
+                my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[FIRE BOLT DEBUG] Cast failed")
-    end
-    return false, 0;
+    return false;
 end
-
 
 return
 {
     menu = menu,
     logics = logics,
-    menu_elements_fire_bolt = menu_elements_fire_bolt,
+    menu_elements = menu_elements,
+    targeting_type = targeting_type
 }

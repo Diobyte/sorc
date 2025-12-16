@@ -289,7 +289,16 @@ end
 local function get_target_list(source, range, collision_table, floor_table, angle_table)
 
     local new_list = {}
-    local possible_targets_list = target_selector.get_near_target_list(source, range);
+    -- Get all enemy actors and filter by distance
+    local all_enemies = actors_manager.get_enemy_actors()
+    local possible_targets_list = {}
+    for _, enemy in ipairs(all_enemies) do
+        local enemy_pos = enemy:get_position()
+        local dist_sqr = enemy_pos:squared_dist_to_ignore_z(source)
+        if dist_sqr <= range * range then
+            table.insert(possible_targets_list, enemy)
+        end
+    end
 
     -- Normalize option tables to support both array-style {true, 1.0} and key-style {is_enabled=true, width=1.0}
     local function as_bool(tbl, index_key)
@@ -502,7 +511,16 @@ local function get_weighted_target(source, scan_radius, min_targets, comparison_
     -- Only scan for new targets if refresh time has passed
     if current_time - last_scan_time >= refresh_rate then
         last_scan_time = current_time
-        cached_target_list = target_selector.get_near_target_list(source, scan_radius)
+        -- Get all enemy actors and filter by distance
+        local all_enemies = actors_manager.get_enemy_actors()
+        cached_target_list = {}
+        for _, enemy in ipairs(all_enemies) do
+            local enemy_pos = enemy:get_position()
+            local dist_sqr = enemy_pos:squared_dist_to_ignore_z(source)
+            if dist_sqr <= scan_radius * scan_radius then
+                table.insert(cached_target_list, enemy)
+            end
+        end
         
         if debug_enabled then
             console.print("[WEIGHTED TARGET DEBUG] === Starting New Scan ===")

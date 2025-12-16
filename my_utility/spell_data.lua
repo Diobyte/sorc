@@ -24,11 +24,11 @@ local spell_data = {
     arc_lash = {
         spell_id = 297902,
         data = spell_data_module.create_spell_data(
-            2.0,           -- radius
+            1.5,           -- radius (melee range)
             3.0,           -- range
             0.8,           -- cast_delay
-            1.2,           -- projectile_speed
-            true,         -- has_collision
+            2.0,           -- projectile_speed
+            true,          -- has_collision
             297902,        -- spell_id
             spell_geometry.circular,
             targeting_type.skillshot
@@ -37,10 +37,10 @@ local spell_data = {
     ball = {
         spell_id = 514030,
         data = spell_data_module.create_spell_data(
-            0.6,           -- radius
+            0.8,           -- radius (bouncing projectile)
             12.0,          -- range
             0.3,           -- cast_delay
-            2.5,           -- projectile_speed
+            3.0,           -- projectile_speed
             true,          -- has_collision
             514030,        -- spell_id
             spell_geometry.rectangular,
@@ -48,15 +48,25 @@ local spell_data = {
         )
     },        
     blizzard = {
-        spell_id = 291403
+        spell_id = 291403,
+        data = spell_data_module.create_spell_data(
+            6.0,           -- radius (large AoE)
+            15.0,          -- range
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            291403,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     chain_lightning = {
         spell_id = 292757,
         data = spell_data_module.create_spell_data(
-            0.5,           -- radius
-            11.0,          -- range
-            2.0,           -- cast_delay
-            4.0,           -- projectile_speed
+            0.5,           -- radius (chain target)
+            20.0,          -- range
+            0.4,           -- cast_delay
+            5.0,           -- projectile_speed
             true,          -- has_collision
             292757,        -- spell_id
             spell_geometry.rectangular,
@@ -66,32 +76,52 @@ local spell_data = {
     charged_bolts = {
         spell_id = 171937,
         data = spell_data_module.create_spell_data(
-            1.2,           -- radius
-            0.7,          -- range
-            1.0,           -- cast_delay
-            2.0,          -- projectile_speed
+            3.0,           -- radius (AoE bolts)
+            15.0,          -- range
+            0.5,           -- cast_delay
+            3.5,           -- projectile_speed
             true,          -- has_collision
             171937,        -- spell_id
-            spell_geometry.rectangular,
+            spell_geometry.circular,
             targeting_type.skillshot
         )
     },
     deep_freeze = {
         spell_id = 291827,
+        data = spell_data_module.create_spell_data(
+            4.0,           -- radius (freeze AoE)
+            8.0,           -- range
+            0.6,           -- cast_delay
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            291827,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     evade = {
         spell_id = 337031
     },
     familiars = {
-        spell_id = 1627075
+        spell_id = 1627075,
+        data = spell_data_module.create_spell_data(
+            0.0,           -- radius (summon)
+            0.0,           -- range (self-cast)
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            1627075,       -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     fire_bolt = {
         spell_id = 153249,
         data = spell_data_module.create_spell_data(
-            0.7,           -- radius
-            20.0,          -- range
-            0.0,           -- cast_delay
-            4.0,          -- projectile_speed
+            0.5,           -- radius
+            30.0,          -- range (long range spam)
+            0.3,           -- cast_delay
+            4.5,           -- projectile_speed
             true,          -- has_collision
             153249,        -- spell_id
             spell_geometry.rectangular,
@@ -101,29 +131,49 @@ local spell_data = {
     fireball = {
         spell_id = 165023,
         data = spell_data_module.create_spell_data(
-            0.7,           -- radius
-            12.0,          -- range
-            1.6,           -- cast_delay
-            2.0,           -- projectile_speed
+            3.0,           -- radius (AoE explosion)
+            25.0,          -- range
+            0.6,           -- cast_delay
+            3.0,           -- projectile_speed
             true,          -- has_collision
             165023,        -- spell_id
-            spell_geometry.rectangular,
+            spell_geometry.circular,
             targeting_type.skillshot
         )
     },
     firewall = {
-        spell_id = 111422
+        spell_id = 111422,
+        data = spell_data_module.create_spell_data(
+            1.5,           -- radius (wall width)
+            15.0,          -- range
+            0.4,           -- cast_delay
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            111422,        -- spell_id
+            spell_geometry.rectangular,
+            targeting_type.skillshot
+        )
     },
     flame_shield = {
-        spell_id = 167341
+        spell_id = 167341,
+        data = spell_data_module.create_spell_data(
+            0.0,           -- radius (self-buff)
+            0.0,           -- range (self-cast)
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            167341,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     frost_bolt = {
         spell_id = 287256,
         data = spell_data_module.create_spell_data(
-            0.7,           -- radius
-            12.0,          -- range
-            1.0,           -- cast_delay
-            3.0,          -- projectile_speed
+            0.5,           -- radius
+            25.0,          -- range
+            0.4,           -- cast_delay
+            4.0,           -- projectile_speed
             true,          -- has_collision
             287256,        -- spell_id
             spell_geometry.rectangular,
@@ -131,13 +181,23 @@ local spell_data = {
         )
     },
     frost_nova = {
-        spell_id = 291215
+        spell_id = 291215,
+        data = spell_data_module.create_spell_data(
+            4.0,           -- radius (AoE freeze)
+            0.0,           -- range (self-cast)
+            0.3,           -- cast_delay
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            291215,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     frozen_orb = {
         spell_id = 291347,
         data = spell_data_module.create_spell_data(
-            1.5,           -- radius
-            2.0,          -- range
+            4.0,           -- radius (large AoE)
+            20.0,          -- range
             1.0,           -- cast_delay
             2.5,          -- projectile_speed
             false,          -- has_collision
@@ -147,21 +207,92 @@ local spell_data = {
         )
     },
     hydra = {
-        spell_id = 146743
+        spell_id = 146743,
+        data = spell_data_module.create_spell_data(
+            0.5,           -- radius
+            15.0,          -- range
+            0.0,           -- cast_delay
+            2.0,           -- projectile_speed
+            true,          -- has_collision
+            146743,        -- spell_id
+            spell_geometry.rectangular,
+            targeting_type.skillshot
+        )
     },
     ice_armor = {
-        spell_id = 297039
+        spell_id = 297039,
+        data = spell_data_module.create_spell_data(
+            0.7,           -- cast_delay
+            2.5,           -- projectile_speed
+            false,         -- has_collision
+            291347,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
+    },
+    hydra = {
+        spell_id = 146743,
+        data = spell_data_module.create_spell_data(
+            1.0,           -- radius (summon size)
+            15.0,          -- range
+            0.0,           -- cast_delay (instant summon)
+            3.0,           -- projectile_speed
+            true,          -- has_collision
+            146743,        -- spell_id
+            spell_geometry.rectangular,
+            targeting_type.skillshot
+        )
+    },
+    ice_armor = {
+        spell_id = 297039,
+        data = spell_data_module.create_spell_data(
+            0.0,           -- radius (self-buff)
+            0.0,           -- range (self-cast)
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            297039,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     ice_blade = {
         spell_id = 291492,
+        data = spell_data_module.create_spell_data(
+            0.0,           -- radius (self-buff)
+            0.0,           -- range (self-cast)
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            291492,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     ice_shards = {
         spell_id = 293195,
         data = spell_data_module.create_spell_data(
-            0.7,           -- radius
-            8.0,          -- range
-            1.0,           -- cast_delay
-            1.0,          -- projectile_speed
+    },
+    ice_blade = {
+        spell_id = 291492,
+        data = spell_data_module.create_spell_data(
+            0.0,           -- radius
+            0.0,           -- range
+            0.0,           -- cast_delay
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            291492,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
+    },
+    ice_shards = {
+        spell_id = 293195,
+        data = spell_data_module.create_spell_data(
+            0.5,           -- radius (per projectile)
+            20.0,          -- range
+            0.5,           -- cast_delay
+            4.0,           -- projectile_speed
             true,          -- has_collision
             293195,        -- spell_id
             spell_geometry.rectangular,
@@ -171,11 +302,11 @@ local spell_data = {
     incinerate = {
         spell_id = 292737,
         data = spell_data_module.create_spell_data(
-            0.7,           -- radius
+            1.0,           -- radius (beam width)
             8.0,           -- range
-            1.6,           -- cast_delay
-            2.0,          -- projectile_speed
-            true,          -- has_collision
+            0.5,           -- cast_delay
+            0.0,           -- projectile_speed (beam)
+            false,         -- has_collision
             292737,        -- spell_id
             spell_geometry.rectangular,
             targeting_type.skillshot
@@ -184,27 +315,37 @@ local spell_data = {
     inferno = {
         spell_id = 294198,
         data = spell_data_module.create_spell_data(
-            2.0,           -- radius
-            6.0,           -- range
-            0.3,           -- cast_delay
+            6.0,           -- radius (large AoE)
+            0.0,           -- range (self-cast)
+            0.8,           -- cast_delay
             0.0,           -- projectile_speed
             false,         -- has_collision
             294198,        -- spell_id
-            spell_geometry.rectangular,
+            spell_geometry.circular,
             targeting_type.skillshot
         )
     },
     meteor = {
-        spell_id = 296998
+        spell_id = 296998,
+        data = spell_data_module.create_spell_data(
+            5.0,           -- radius (impact AoE)
+            15.0,          -- range
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            296998,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
     spark = {
         spell_id = 143483,
         data = spell_data_module.create_spell_data(
-            0.7,           -- radius
+            0.5,           -- radius
             10.0,          -- range
             1.0,           -- cast_delay
-            3.5,          -- projectile_speed
-            false,          -- has_collision
+            3.5,           -- projectile_speed
+            false,         -- has_collision
             143483,        -- spell_id
             spell_geometry.rectangular,
             targeting_type.skillshot
@@ -212,15 +353,25 @@ local spell_data = {
     },
     spear = {
         spell_id = 292074,
+        data = spell_data_module.create_spell_data(
+            1.0,           -- radius (piercing projectile)
+            20.0,          -- range
+            0.1,           -- cast_delay
+            6.0,           -- projectile_speed
+            false,         -- has_collision
+            292074,        -- spell_id
+            spell_geometry.rectangular,
+            targeting_type.skillshot
+        )
     },
     teleport = {
         spell_id = 288106,
         data = spell_data_module.create_spell_data(
-            2.5,           -- radius
-            10.0,          -- range
+            2.0,           -- radius (teleport range)
+            35.0,          -- range
             0.3,           -- cast_delay
-            0.7,          -- projectile_speed
-            false,          -- has_collision
+            0.0,           -- projectile_speed (instant)
+            false,         -- has_collision
             288106,        -- spell_id
             spell_geometry.circular,
             targeting_type.skillshot
@@ -229,10 +380,10 @@ local spell_data = {
     teleport_ench = {
         spell_id = 959728,
         data = spell_data_module.create_spell_data(
-            2.5,           -- radius
-            10.0,           -- range
+            2.0,           -- radius (enhanced teleport)
+            35.0,          -- range
             0.3,           -- cast_delay
-            0.7,           -- projectile_speed
+            0.0,           -- projectile_speed (instant)
             false,         -- has_collision
             959728,        -- spell_id
             spell_geometry.circular,
@@ -240,7 +391,17 @@ local spell_data = {
         )
     },
     unstable_current = {
-        spell_id = 517417
+        spell_id = 517417,
+        data = spell_data_module.create_spell_data(
+            9.0,           -- radius (massive AoE)
+            0.0,           -- range (self-cast)
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
+            false,         -- has_collision
+            517417,        -- spell_id
+            spell_geometry.circular,
+            targeting_type.skillshot
+        )
     },
 
     -- passives

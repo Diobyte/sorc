@@ -1,100 +1,63 @@
 local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_sorc_base_frost =
+local max_spell_range = 0.0  -- Self-cast AoE
+local targeting_type = "self"
+local menu_elements = 
 {
     tree_tab           = tree_node:new(1),
-    main_boolean       = checkbox:new(true, get_hash(my_utility.plugin_label .. "disable_enable_ability")),
-    debug_mode         = checkbox:new(false, get_hash(my_utility.plugin_label .. "frost_nova_debug_mode")),
-    min_max_targets    = slider_int:new(0, 30, 5, get_hash(my_utility.plugin_label .. "min_max_number_of_targets_for_cast"))
+    main_boolean       = checkbox:new(true, get_hash(my_utility.plugin_label .. "frost_nova_main_boolean")),
+    min_max_targets    = slider_int:new(1, 10, 3, get_hash(my_utility.plugin_label .. "frost_nova_min_max_targets"))
 }
 
 local function menu()
 
-    if menu_elements_sorc_base_frost.tree_tab:push("Frost Nova") then
-        menu_elements_sorc_base_frost.main_boolean:render("Enable Spell", "")
-        menu_elements_sorc_base_frost.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
+    if menu_elements.tree_tab:push("Frost Nova") then
+        menu_elements.main_boolean:render("Enable Spell", "")
+        menu_elements.min_max_targets:render("Min Targets", "", 1)
 
-        if menu_elements_sorc_base_frost.main_boolean:get() then
-            menu_elements_sorc_base_frost.min_max_targets:render("Min hits", "Amount of targets to cast the spell")
-        end
-
-        menu_elements_sorc_base_frost.tree_tab:pop()
+        menu_elements.tree_tab:pop()
     end
 end
 
 local next_time_allowed_cast = 0.0;
-local spell_id_frost_nova = 291215;
-local function logics()
+local function logics(target)
 
-    local menu_boolean = menu_elements_sorc_base_frost.main_boolean:get();
-    local debug_enabled = menu_elements_sorc_base_frost.debug_mode:get();
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean,
-                next_time_allowed_cast,
-                spell_id_frost_nova);
+                menu_boolean, 
+                next_time_allowed_cast, 
+                spell_data.frost_nova.spell_id);
 
     if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[FROST NOVA DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
+        return false;
     end;
 
     local time = get_time_since_inject()
     if  time - next_time_allowed_cast < 0.2 then
-        if debug_enabled then
-            console.print("[FROST NOVA DEBUG] Cooldown not ready - waiting")
-        end
         return false
     end
 
     local area_data = target_selector.get_most_hits_target_circular_area_heavy(get_player_position(), 3.66, 3.66)
     local amount_hits = area_data.n_hits
 
-    if debug_enabled then
-        console.print("[FROST NOVA DEBUG] Targets in area: " .. amount_hits .. " | Required: " .. menu_elements_sorc_base_frost.min_max_targets:get())
-    end
-
-    if amount_hits < menu_elements_sorc_base_frost.min_max_targets:get() then
-        local is_boss = false
-        for index, value in ipairs(area_data.victim_list) do
-            if value:is_boss() then
-                is_boss = true
-                break
-            end
-        end
-
-        if debug_enabled then
-            console.print("[FROST NOVA DEBUG] Not enough targets - Boss present: " .. (is_boss and "Yes" or "No"))
-        end
-
-        if not is_boss then
-            return false, 0;
-        end
-
+    if amount_hits < menu_elements.min_max_targets:get() then
+        return false;
     end;
 
-    if debug_enabled then
-        console.print("[FROST NOVA DEBUG] Attempting cast")
-    end
-
-    if cast_spell.self(spell_id_frost_nova, 0.15) then
-        local cooldown = 0.2
+    if cast_spell.self(spell_data.frost_nova.spell_id, 0.15) then
+        local cooldown = my_utility.spell_delays.regular_cast
         next_time_allowed_cast = time + cooldown
-        if debug_enabled then
-            console.print("[FROST NOVA DEBUG] Cast successful")
-        end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[FROST NOVA DEBUG] Cast failed")
-    end
-    return false, 0;
+    return false;
 end
 
 return
 {
     menu = menu,
     logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = "self"
 }

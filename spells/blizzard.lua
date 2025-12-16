@@ -1,185 +1,85 @@
---this does sometimes throw an error into the console but it does not impede the work of it. works just fine
---120.81 : ...cuments\diablo\scripts\base_sorcerer\spells/blizzard.lua:123: attempt to perform arithmetic on global 'current_time' (a nil value)
---stack traceback:
---...cuments\diablo\scripts\base_sorcerer\spells/blizzard.lua:123: in function 'logics'
---...dummydum\Documents\diablo\scripts\base_sorcerer\main.lua:200: in function <...dummydum\Documents\diablo\scripts\base_sorcerer\main.lua:90> 
+local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local my_utility = require("my_utility/my_utility");
-
-local menu_elements_blizzard = 
+local max_spell_range = 15.0
+local targeting_type = "ranged"
+local menu_elements =
 {
-    blizz_sub                       = tree_node:new(1),
-    blizz_boolean                   = checkbox:new(true, get_hash(my_utility.plugin_label .. "blizz_base_boolean")),
-    debug_mode                      = checkbox:new(false, get_hash(my_utility.plugin_label .. "blizzard_debug_mode")),
-    blizz_mode                      = combo_box:new(0, get_hash(my_utility.plugin_label .. "blizz_cast_modes")),
-    min_hits_slider                 = slider_int:new(0, 30, 5, get_hash(my_utility.plugin_label .. "_min_hits_slider_blizz_base")),
-
-    allow_elite_single_target       = checkbox:new(true, get_hash(my_utility.plugin_label .. "allow_elite_single_target_bizz_base")),
+    tree_tab            = tree_node:new(1),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "blizzard_main_bool_base")),
+    targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "blizzard_targeting_mode")),
+    min_target_range    = slider_float:new(1, max_spell_range - 1, 3,
+        get_hash(my_utility.plugin_label .. "blizzard_min_target_range")),
+    min_enemies         = slider_int:new(1, 10, 3, get_hash(my_utility.plugin_label .. "blizzard_min_enemies")),
 }
 
 local function menu()
-    if menu_elements_blizzard.blizz_sub:push("Blizzard") then
-        menu_elements_blizzard.blizz_boolean:render("Enable Blizzard Cast", "")
-        menu_elements_blizzard.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
-
-        if menu_elements_blizzard.blizz_boolean:get() then
-            local dropbox_options = {"Combo & Clear", "Combo Only", "Clear Only"}
-            menu_elements_blizzard.blizz_mode:render("Cast Modes", dropbox_options, "")
-            menu_elements_blizzard.min_hits_slider:render("Min Hits", "")
-            menu_elements_blizzard.allow_elite_single_target:render("Always Cast On Single Elite", "")
+    if menu_elements.tree_tab:push("Blizzard") then
+        menu_elements.main_boolean:render("Enable Blizzard", "Ground-targeted AoE ultimate that damages and slows enemies")
+        if menu_elements.main_boolean:get() then
+            menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged,
+                my_utility.targeting_mode_description)
+            menu_elements.min_target_range:render("Min Target Distance",
+                "\n     Must be lower than Max Targeting Range     \n\n", 1)
+            menu_elements.min_enemies:render("Minimum Enemies", "Minimum number of enemies in AoE to cast")
         end
 
-        menu_elements_blizzard.blizz_sub:pop()
+        menu_elements.tree_tab:pop()
     end
 end
 
+local next_time_allowed_cast = 0;
 
-local blizzard_buff_name = "Sorcerer_Blizzard";
-
-local blizzard_buff_name_hashed_c = 291403;
-
-local spell_id_blizzard = 291403;
-
-local next_time_allowed_cast = 0.0;
-
-local function logics(best_target, target_selector_data)
-    
-    local menu_boolean = menu_elements_blizzard.blizz_boolean:get();
-    local debug_enabled = menu_elements_blizzard.debug_mode:get();
+local function logics(target)
+    if not target then return false end;
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean, 
-                next_time_allowed_cast, 
-                spell_id_blizzard);
+        menu_boolean,
+        next_time_allowed_cast,
+        spell_data.blizzard.spell_id);
 
-    if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[BLIZZARD DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false;
-    end;
+    if not is_logic_allowed then return false end;
 
-    local local_player = get_local_player();
-    local current_resource = local_player:get_primary_resource_current();
-    local max_resource = local_player:get_primary_resource_max();
-    local resource_percentage = current_resource / max_resource; 
-    local is_low_resources = resource_percentage < 0.2;
-
-    if debug_enabled then
-        console.print("[BLIZZARD DEBUG] Mana: " .. string.format("%.1f", resource_percentage * 100) .. "% | Required: 20%")
-    end
-
-    if is_low_resources then
-        if debug_enabled then
-            console.print("[BLIZZARD DEBUG] Low resources - not casting")
-        end
-        return false;
-    end;
-
-    local circle_radius = 3.0; 
-    local player_position = get_player_position();
-    local area_data = target_selector.get_most_hits_target_circular_area_heavy(player_position, 9.0, circle_radius)
-    local best_target = area_data.main_target;
-    
-    if not best_target then
-        if debug_enabled then
-            console.print("[BLIZZARD DEBUG] No target found in area")
-        end
-        return;
-    end
-
-    local best_target_position = best_target:get_position();
-    local best_cast_data = my_utility.get_best_point(best_target_position, circle_radius, area_data.victim_list);
-
-    local best_hit_list = best_cast_data.victim_list
-
-    local is_single_target_allowed = false;
-
-    if menu_elements_blizzard.allow_elite_single_target:get() then
-        for _, unit in ipairs(best_hit_list) do
-            local current_health_percentage = unit:get_current_health() / unit:get_max_health() * 100
-
-            if unit:is_boss() and current_health_percentage > 22 then
-                is_single_target_allowed = true
-                if debug_enabled then
-                    console.print("[BLIZZARD DEBUG] Single target allowed - Boss with " .. string.format("%.1f", current_health_percentage) .. "% health")
-                end
-                break 
-            end
-        
-            if unit:is_elite() and current_health_percentage > 45 then
-                is_single_target_allowed = true
-                if debug_enabled then
-                    console.print("[BLIZZARD DEBUG] Single target allowed - Elite with " .. string.format("%.1f", current_health_percentage) .. "% health")
-                end
-                break 
-            end
-        end
-    end
-
-    local best_cast_hits = best_cast_data.hits;
-    
-    if debug_enabled then
-        console.print("[BLIZZARD DEBUG] Potential hits: " .. best_cast_hits .. " | Required: " .. menu_elements_blizzard.min_hits_slider:get() .. " | Single target allowed: " .. (is_single_target_allowed and "Yes" or "No"))
-    end
-    
-    if best_cast_hits < menu_elements_blizzard.min_hits_slider:get() and not is_single_target_allowed then
-        if debug_enabled then
-            console.print("[BLIZZARD DEBUG] Not enough hits - not casting")
-        end
+    if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
         return false
     end
 
-    local blizzard_count = 0
-
-    for _, unit in ipairs(best_hit_list) do
-        
-        local buffs = unit:get_buffs()
-
-        for _, buff in ipairs(buffs) do
-            if buff.name_hash == blizzard_buff_name_hashed_c then
-                blizzard_count = blizzard_count + 1
-                break 
+    -- Check for minimum enemies in AoE radius
+    local target_pos = target:get_position()
+    local player_pos = get_player_position()
+    local enemies = actors_manager.get_enemy_actors()
+    local enemies_in_aoe = 0
+    for _, enemy in ipairs(enemies) do
+        if enemy and enemy:is_enemy() then
+            local enemy_pos = enemy:get_position()
+            local distance = target_pos:dist_to(enemy_pos)
+            if distance <= 3.0 then -- Blizzard AoE radius
+                enemies_in_aoe = enemies_in_aoe + 1
             end
         end
     end
-
-    local percentage_with_buff = (blizzard_count / best_cast_hits);
-
-    if debug_enabled then
-        console.print("[BLIZZARD DEBUG] Targets with Blizzard buff: " .. blizzard_count .. "/" .. best_cast_hits .. " (" .. string.format("%.1f", percentage_with_buff * 100) .. "%)")
+    if enemies_in_aoe < menu_elements.min_enemies:get() then
+        return false;
     end
 
-   -- local is_allowed = percentage_with_buff < 0.25;
-
-   -- if not is_allowed then                                --dont need this personally for blizzard build as that is your damage and you want to spam them as much as you can
-    --    return false;
-    --end
-
-
-    local best_cast_position = best_cast_data.point;
-    
-    if debug_enabled then
-        console.print("[BLIZZARD DEBUG] Attempting cast at best position")
-    end
-    
-    if cast_spell.position(spell_id_blizzard, best_cast_position, 0.40) then
-        if debug_enabled then
-            console.print("[BLIZZARD DEBUG] Cast successful - Hits: " .. best_cast_hits)
-        end
+    if cast_spell.position(spell_data.blizzard.spell_id, target_pos, 0) then
         local current_time = get_time_since_inject();
-        local cooldown = 0.3;
-        next_time_allowed_cast = current_time + cooldown; -- fixed an oopsie that chaser did where he wrote time instead of current_time
-        return true, cooldown;
-    end
-    
-    if debug_enabled then
-        console.print("[BLIZZARD DEBUG] Cast failed")
-    end
+        next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
+        if _G.__sorc_debug__ then
+            console.print("Cast Blizzard - Target: " ..
+                my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1] ..
+                ", Enemies: " .. enemies_in_aoe);
+        end
+        return true;
+    end;
+
     return false;
 end
 
-return 
+return
 {
     menu = menu,
-    logics = logics,   
+    logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = targeting_type
 }

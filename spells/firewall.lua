@@ -1,74 +1,62 @@
-local my_utility = require("my_utility/my_utility");
+local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_firewall = 
+local max_spell_range = spell_data.firewall.data.range
+local targeting_type = "ranged"
+local menu_elements = 
 {
     tree_tab              = tree_node:new(1),
-    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean_firwall")),
-    debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "firewall_debug_mode")),
+    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "firewall_main_boolean")),
+    targeting_mode        = combo_box:new(0, get_hash(my_utility.plugin_label .. "firewall_targeting_mode")),
+    min_target_range      = slider_float:new(1.0, 20.0, 5.0, get_hash(my_utility.plugin_label .. "firewall_min_target_range"))
 }
 
 local function menu()
     
-    if menu_elements_firewall.tree_tab:push("Firewall")then
-        menu_elements_firewall.main_boolean:render("Enable Spell", "")
-        menu_elements_firewall.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
+    if menu_elements.tree_tab:push("Firewall")then
+        menu_elements.main_boolean:render("Enable Spell", "")
+        menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes, "")
+        menu_elements.min_target_range:render("Min Target Range", "", 1)
  
-        menu_elements_firewall.tree_tab:pop()
+        menu_elements.tree_tab:pop()
     end
 end
 
-local spell_id_firewall = 111422
 local next_time_allowed_cast = 0.0;
 
 local function logics(target)
     
-    local menu_boolean = menu_elements_firewall.main_boolean:get();
-    local debug_enabled = menu_elements_firewall.debug_mode:get();
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
                 menu_boolean, 
                 next_time_allowed_cast, 
-                spell_id_firewall);
+                spell_data.firewall.spell_id);
 
     if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[FIREWALL DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
+        return false;
     end;
-
+    
     if not target then
-        if debug_enabled then
-            console.print("[FIREWALL DEBUG] No target provided")
-        end
-        return false, 0;
+        return false;
     end;
 
     local target_position = target:get_position();
 
-    if debug_enabled then
-        console.print("[FIREWALL DEBUG] Attempting cast at target position")
-    end
-
-    if cast_spell.position(spell_id_firewall, target_position, 0.35) then
+    if cast_spell.position(spell_data.firewall.spell_id, target_position, 0.35) then
         local current_time = get_time_since_inject();
-        local cooldown = 0.1;
+        local cooldown = my_utility.spell_delays.regular_cast;
         next_time_allowed_cast = current_time + cooldown;
         
-        if debug_enabled then
-            console.print("[FIREWALL DEBUG] Cast successful")
-        end
-        return true, cooldown;
+        return true;
     end
 
-    if debug_enabled then
-        console.print("[FIREWALL DEBUG] Cast failed")
-    end
-    return false, 0;
-
+    return false;
 end
 
 return 
 {
     menu = menu,
-    logics = logics,   
+    logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = "ranged"
 }

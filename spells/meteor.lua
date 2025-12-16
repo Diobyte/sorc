@@ -1,74 +1,65 @@
-local my_utility = require("my_utility/my_utility");
+local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_meteor = 
+local max_spell_range = 15.0
+local targeting_type = "ranged"
+local menu_elements =
 {
-    tree_tab              = tree_node:new(1),
-    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean_meteor")),
-    debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "meteor_debug_mode")),
+    tree_tab            = tree_node:new(1),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "meteor_main_bool_base")),
+    targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "meteor_targeting_mode")),
+    min_target_range    = slider_float:new(1, max_spell_range - 1, 3,
+        get_hash(my_utility.plugin_label .. "meteor_min_target_range")),
 }
 
 local function menu()
-    
-    if menu_elements_meteor.tree_tab:push("Meteor")then
-        menu_elements_meteor.main_boolean:render("Enable Spell", "")
-        menu_elements_meteor.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
- 
-        menu_elements_meteor.tree_tab:pop()
+    if menu_elements.tree_tab:push("Meteor") then
+        menu_elements.main_boolean:render("Enable Meteor", "Ground-targeted AoE ultimate that deals massive fire damage")
+        if menu_elements.main_boolean:get() then
+            menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged,
+                my_utility.targeting_mode_description)
+            menu_elements.min_target_range:render("Min Target Distance",
+                "\n     Must be lower than Max Targeting Range     \n\n", 1)
+        end
+
+        menu_elements.tree_tab:pop()
     end
 end
 
-local spell_id_meteor = 296998
-local next_time_allowed_cast = 0.0;
+local next_time_allowed_cast = 0;
 
-local function logics(best_target, target_selector_data)
-    
-    local menu_boolean = menu_elements_meteor.main_boolean:get();
-    local debug_enabled = menu_elements_meteor.debug_mode:get();
+local function logics(target)
+    if not target then return false end;
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean, 
-                next_time_allowed_cast, 
-                spell_id_meteor);
+        menu_boolean,
+        next_time_allowed_cast,
+        spell_data.meteor.spell_id);
 
-    if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[METEOR DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false;
-    end;
-    
-    if not best_target then
-        if debug_enabled then
-            console.print("[METEOR DEBUG] No target provided")
-        end
-        return false;
-    end;
+    if not is_logic_allowed then return false end;
 
-    local target_position = best_target:get_position();
-
-    if debug_enabled then
-        console.print("[METEOR DEBUG] Attempting cast at target position")
+    if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
+        return false
     end
 
-    if cast_spell.position(spell_id_meteor, target_position, 0.35) then
+    local target_pos = target:get_position()
+    if cast_spell.position(spell_data.meteor.spell_id, target_pos, 0) then
         local current_time = get_time_since_inject();
-        local cooldown = 1.0;
-        next_time_allowed_cast = current_time + cooldown;
-        
-        if debug_enabled then
-            console.print("[METEOR DEBUG] Cast successful")
+        next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
+        if _G.__sorc_debug__ then
+            console.print("Cast Meteor - Target: " ..
+                my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
-        return true, cooldown;
-    end
+        return true;
+    end;
 
-    if debug_enabled then
-        console.print("[METEOR DEBUG] Cast failed")
-    end
     return false;
-
 end
 
-return 
+return
 {
     menu = menu,
-    logics = logics,   
+    logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = targeting_type
 }

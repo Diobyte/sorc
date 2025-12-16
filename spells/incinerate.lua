@@ -1,88 +1,64 @@
 local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local incinerate_menu_elements =
+local max_spell_range = 8.0
+local targeting_type = "ranged"
+local menu_elements =
 {
     tree_tab            = tree_node:new(1),
-    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "incinerate_main_boolean")),
-    debug_mode          = checkbox:new(false, get_hash(my_utility.plugin_label .. "incinerate_debug_mode")),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "incinerate_main_bool_base")),
+    targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "incinerate_targeting_mode")),
+    min_target_range    = slider_float:new(1, max_spell_range - 1, 3,
+        get_hash(my_utility.plugin_label .. "incinerate_min_target_range")),
 }
 
 local function menu()
-    
-    if incinerate_menu_elements.tree_tab:push("incinerate")then
-        incinerate_menu_elements.main_boolean:render("Enable Spell", "")
-        incinerate_menu_elements.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
- 
-        incinerate_menu_elements.tree_tab:pop()
+    if menu_elements.tree_tab:push("Incinerate") then
+        menu_elements.main_boolean:render("Enable Incinerate", "Single target fire spell with high damage")
+        if menu_elements.main_boolean:get() then
+            menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_ranged,
+                my_utility.targeting_mode_description)
+            menu_elements.min_target_range:render("Min Target Distance",
+                "\n     Must be lower than Max Targeting Range     \n\n", 1)
+        end
+
+        menu_elements.tree_tab:pop()
     end
 end
 
-local spell_id_incinerate = 292737;
+local next_time_allowed_cast = 0;
 
-local incinerate_spell_data = spell_data:new(
-    0.7,                        -- radius
-    8.0,                        -- range
-    1.6,                        -- cast_delay
-    2.0,                        -- projectile_speed
-    true,                      -- has_collision
-    spell_id_incinerate,           -- spell_id
-    spell_geometry.rectangular, -- geometry_type
-    targeting_type.skillshot    --targeting_type
-)
-local next_time_allowed_cast = 0.0;
-local function logics(best_target, target_selector_data)
-    
-    local menu_boolean = incinerate_menu_elements.main_boolean:get();
-    local debug_enabled = incinerate_menu_elements.debug_mode:get();
+local function logics(target)
+    if not target then return false end;
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean, 
-                next_time_allowed_cast, 
-                spell_id_incinerate);
+        menu_boolean,
+        next_time_allowed_cast,
+        spell_data.incinerate.spell_id);
 
-    if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[INCINERATE DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
-    end;
-    
-    if not best_target then
-        if debug_enabled then
-            console.print("[INCINERATE DEBUG] No target provided")
-        end
-        return false, 0;
-    end;
+    if not is_logic_allowed then return false end;
 
-    local player_local = get_local_player();
-    
-    local player_position = get_player_position();
-    local target_position = best_target:get_position();
-
-    if debug_enabled then
-        console.print("[INCINERATE DEBUG] Attempting cast on target")
+    if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
+        return false
     end
 
-    if cast_spell.target(best_target, incinerate_spell_data, false) then
-
+    if cast_spell.target(target, spell_data.incinerate.spell_id, 0) then
         local current_time = get_time_since_inject();
-        local cooldown = 0.7;
-        next_time_allowed_cast = current_time + cooldown;
-
-        if debug_enabled then
-            console.print("[INCINERATE DEBUG] Cast successful")
+        next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
+        if _G.__sorc_debug__ then
+            console.print("Cast Incinerate - Target: " ..
+                my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[INCINERATE DEBUG] Cast failed")
-    end
-    return false, 0;
+    return false;
 end
 
-
-return 
+return
 {
     menu = menu,
-    logics = logics,   
+    logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = targeting_type
 }

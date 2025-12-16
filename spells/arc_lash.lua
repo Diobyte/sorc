@@ -1,85 +1,64 @@
-local my_utility = require("my_utility/my_utility");
+local my_utility = require("my_utility/my_utility")
+local spell_data = require("my_utility/spell_data")
 
-local menu_elements_sorc_lash_base = 
+local max_spell_range = 3.0
+local targeting_type = "melee"
+local menu_elements =
 {
-    tree_tab              = tree_node:new(1),
-    main_boolean          = checkbox:new(true, get_hash(my_utility.plugin_label .. "main_boolean_arc_lash")),
-    debug_mode            = checkbox:new(false, get_hash(my_utility.plugin_label .. "arc_lash_debug_mode")),
+    tree_tab            = tree_node:new(1),
+    main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "arc_lash_main_bool_base")),
+    targeting_mode      = combo_box:new(0, get_hash(my_utility.plugin_label .. "arc_lash_targeting_mode")),
+    min_target_range    = slider_float:new(1, max_spell_range - 1, 1,
+        get_hash(my_utility.plugin_label .. "arc_lash_min_target_range")),
 }
 
 local function menu()
-    
-    if menu_elements_sorc_lash_base.tree_tab:push("Arc Lash") then
-        menu_elements_sorc_lash_base.main_boolean:render("Enable Spell", "")
-        menu_elements_sorc_lash_base.debug_mode:render("Debug Mode", "Enable debug logging for troubleshooting")
- 
-        menu_elements_sorc_lash_base.tree_tab:pop()
+    if menu_elements.tree_tab:push("Arc Lash") then
+        menu_elements.main_boolean:render("Enable Arc Lash", "")
+        if menu_elements.main_boolean:get() then
+            menu_elements.targeting_mode:render("Targeting Mode", my_utility.targeting_modes_melee,
+                my_utility.targeting_mode_description)
+            menu_elements.min_target_range:render("Min Target Distance",
+                "\n     Must be lower than Max Targeting Range     \n\n", 1)
+        end
+
+        menu_elements.tree_tab:pop()
     end
 end
 
-local local_player = get_local_player();
-if local_player == nil then
-    return
-end
+local next_time_allowed_cast = 0;
 
-local spell_id_arc_lash = 297902
-local arc_lash_data = spell_data:new(
-    2.0,                              -- radius
-    3.0,                            -- range
-    0.8,                            -- cast_delay
-    1.2,                            -- projectile_speed
-    true,                          -- has_collision
-    spell_id_arc_lash,              -- spell_id
-    spell_geometry.circular,        -- geometry_type
-    targeting_type.skillshot        --targeting_type
-)
-local next_time_allowed_cast = 0.0;
-local function logics(best_target, target_selector_data)
-    
-    local menu_boolean = menu_elements_sorc_lash_base.main_boolean:get();
-    local debug_enabled = menu_elements_sorc_lash_base.debug_mode:get();
+local function logics(target)
+    if not target then return false end;
+    local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(
-                menu_boolean, 
-                next_time_allowed_cast,
-                spell_id_arc_lash);
+        menu_boolean,
+        next_time_allowed_cast,
+        spell_data.arc_lash.spell_id);
 
-    if not is_logic_allowed then
-        if debug_enabled then
-            console.print("[ARC LASH DEBUG] Logic not allowed - spell conditions not met")
-        end
-        return false, 0;
-    end;
-    
-    if not best_target then
-        if debug_enabled then
-            console.print("[ARC LASH DEBUG] No target provided")
-        end
-        return false, 0;
-    end;
+    if not is_logic_allowed then return false end;
 
-    if debug_enabled then
-        console.print("[ARC LASH DEBUG] Attempting cast on target")
+    if not my_utility.is_in_range(target, max_spell_range) or my_utility.is_in_range(target, menu_elements.min_target_range:get()) then
+        return false
     end
 
-    if cast_spell.target(best_target, arc_lash_data, false) then
+    if cast_spell.target(target, spell_data.arc_lash.spell_id, 0) then
         local current_time = get_time_since_inject();
-        local cooldown = 0.4;
-        next_time_allowed_cast = current_time + cooldown;
-
-        if debug_enabled then
-            console.print("[ARC LASH DEBUG] Cast successful")
+        next_time_allowed_cast = current_time + my_utility.spell_delays.regular_cast;
+        if _G.__sorc_debug__ then
+            console.print("Cast Arc Lash - Target: " ..
+                my_utility.targeting_modes[menu_elements.targeting_mode:get() + 1]);
         end
-        return true, cooldown;
+        return true;
     end;
 
-    if debug_enabled then
-        console.print("[ARC LASH DEBUG] Cast failed")
-    end
-    return false, 0;
+    return false;
 end
 
 return
 {
     menu = menu,
     logics = logics,
+    menu_elements = menu_elements,
+    targeting_type = targeting_type
 }
