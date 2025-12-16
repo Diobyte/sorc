@@ -425,48 +425,7 @@ local function is_action_allowed()
     return true
 end
 
-local function is_spell_allowed(spell_enable_check, next_cast_allowed_time, spell_id)
-    if not spell_enable_check then
-        return false;
-    end;
 
-    local current_time = get_time_since_inject();
-    if current_time < next_cast_allowed_time then
-        return false;
-    end;
-
-    if not utility.is_spell_ready(spell_id) then
-        return false;
-    end
-
-    -- evade abort
-    local local_player = get_local_player();
-    if local_player then
-        local player_position = local_player:get_position();
-        if evade.is_dangerous_position(player_position) then
-            return false;
-        end
-    end
-
-    if is_auto_play_enabled() then
-        return true;
-    end
-
-    local current_orb_mode = orbwalker.get_orb_mode()
-
-    if current_orb_mode == orb_mode.none then
-        return false
-    end
-
-    local is_current_orb_mode_pvp = current_orb_mode == orb_mode.pvp
-    local is_current_orb_mode_clear = current_orb_mode == orb_mode.clear
-
-    if not is_current_orb_mode_pvp and not is_current_orb_mode_clear then
-        return false;
-    end
-
-    return true
-end
 
 local function generate_points_around_target(target_position, radius, num_points)
     local points = {};

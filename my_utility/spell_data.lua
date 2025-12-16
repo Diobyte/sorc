@@ -206,26 +206,15 @@ local spell_data = {
             targeting_type.skillshot
         )
     },
-    hydra = {
-        spell_id = 146743,
-        data = spell_data_module.create_spell_data(
-            0.5,           -- radius
-            15.0,          -- range
-            0.0,           -- cast_delay
-            2.0,           -- projectile_speed
-            true,          -- has_collision
-            146743,        -- spell_id
-            spell_geometry.rectangular,
-            targeting_type.skillshot
-        )
-    },
     ice_armor = {
         spell_id = 297039,
         data = spell_data_module.create_spell_data(
-            0.7,           -- cast_delay
-            2.5,           -- projectile_speed
+            0.0,           -- radius (self-buff)
+            0.0,           -- range (self-cast)
+            0.0,           -- cast_delay (instant)
+            0.0,           -- projectile_speed
             false,         -- has_collision
-            291347,        -- spell_id
+            297039,        -- spell_id
             spell_geometry.circular,
             targeting_type.skillshot
         )
@@ -243,42 +232,12 @@ local spell_data = {
             targeting_type.skillshot
         )
     },
-    ice_armor = {
-        spell_id = 297039,
-        data = spell_data_module.create_spell_data(
-            0.0,           -- radius (self-buff)
-            0.0,           -- range (self-cast)
-            0.0,           -- cast_delay (instant)
-            0.0,           -- projectile_speed
-            false,         -- has_collision
-            297039,        -- spell_id
-            spell_geometry.circular,
-            targeting_type.skillshot
-        )
-    },
     ice_blade = {
         spell_id = 291492,
         data = spell_data_module.create_spell_data(
             0.0,           -- radius (self-buff)
             0.0,           -- range (self-cast)
             0.0,           -- cast_delay (instant)
-            0.0,           -- projectile_speed
-            false,         -- has_collision
-            291492,        -- spell_id
-            spell_geometry.circular,
-            targeting_type.skillshot
-        )
-    },
-    ice_shards = {
-        spell_id = 293195,
-        data = spell_data_module.create_spell_data(
-    },
-    ice_blade = {
-        spell_id = 291492,
-        data = spell_data_module.create_spell_data(
-            0.0,           -- radius
-            0.0,           -- range
-            0.0,           -- cast_delay
             0.0,           -- projectile_speed
             false,         -- has_collision
             291492,        -- spell_id
