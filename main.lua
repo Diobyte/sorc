@@ -334,7 +334,7 @@ local function evaluate_targets(target_list, melee_range)
 
             -- Enemy count in evaluation radius
             local enemy_count_in_radius = my_utility.enemy_count_in_range(target_position,
-                menu_elements.best_target_evaluation_radius:get())
+                menu_elements.best_target_evaluation_radius:get(), target_list)
             enemy_score = enemy_score * (1.0 + enemy_count_in_radius * 0.1)
 
             -- Visibility

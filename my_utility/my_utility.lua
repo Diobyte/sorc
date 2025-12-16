@@ -94,13 +94,13 @@ local function is_action_allowed()
    end
 
     local is_mounted = false;
-    local is_blood_mist = false;
+    local is_deep_freeze = false;
     local is_shrine_conduit = false;
     local local_player_buffs = local_player:get_buffs();
 
     for _, buff in ipairs(local_player_buffs) do
-          if buff.name_hash == 493422 then  -- Blood Mist
-              is_blood_mist = true;
+          if buff.name_hash == 291827 then  -- Deep Freeze
+              is_deep_freeze = true;
               break;
           elseif buff.name_hash == 1923 then  -- Mount
             is_mounted = true;
@@ -111,8 +111,8 @@ local function is_action_allowed()
           end
     end
 
-      -- do not make any actions while in blood mist
-      if is_blood_mist or is_mounted or is_shrine_conduit then
+      -- do not make any actions while in deep freeze
+      if is_deep_freeze or is_mounted or is_shrine_conduit then
           return false;
       end
 
@@ -289,8 +289,8 @@ local function get_melee_range()
     return 3.0 -- Standard melee range
 end
 
-local function enemy_count_in_range(position, range)
-    local enemies = actors_manager.get_enemy_npcs()
+local function enemy_count_in_range(position, range, enemies_list)
+    local enemies = enemies_list or actors_manager.get_enemy_npcs()
     local count = 0
 
     for _, enemy in ipairs(enemies) do

@@ -7,11 +7,15 @@ local menu_elements =
 {
     tree_tab            = tree_node:new(1),
     main_boolean        = checkbox:new(true, get_hash(my_utility.plugin_label .. "familiars_main_bool_base")),
+    min_enemies         = slider_int:new(1, 20, 1, get_hash(my_utility.plugin_label .. "familiars_min_enemies")),
 }
 
 local function menu()
     if menu_elements.tree_tab:push("Familiars") then
         menu_elements.main_boolean:render("Enable Familiars", "Summon magical familiars to aid in combat")
+        if menu_elements.main_boolean:get() then
+            menu_elements.min_enemies:render("Minimum Enemies", "Minimum number of enemies in range to cast")
+        end
         menu_elements.tree_tab:pop()
     end
 end
@@ -23,6 +27,12 @@ local function logics(target)
     local menu_boolean = menu_elements.main_boolean:get();
     local is_logic_allowed = my_utility.is_spell_allowed(menu_boolean, next_time_allowed_cast, spell_data.familiars.spell_id);
     if not is_logic_allowed then return false end;
+
+    local player_position = get_player_position();
+    local enemies_in_range = my_utility.enemy_count_in_range(player_position, 15.0);
+    if enemies_in_range < menu_elements.min_enemies:get() then
+        return false;
+    end
 
     if cast_spell.self(spell_data.familiars.spell_id, 0) then
         local current_time = get_time_since_inject();

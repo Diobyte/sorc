@@ -35,7 +35,8 @@ local function logics(target)
         return false;
     end;
 
-    local enemies_in_range = my_utility.enemy_count_in_range(spell_data.frost_nova.data.radius)
+    local player_position = get_player_position();
+    local enemies_in_range = my_utility.enemy_count_in_range(player_position, spell_data.frost_nova.data.radius)
     if enemies_in_range < menu_elements.min_max_targets:get() then
         return false;
     end;

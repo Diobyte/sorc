@@ -46,18 +46,7 @@ local function logics(target)
 
     -- Check for minimum enemies in AoE radius
     local target_pos = target:get_position()
-    local player_pos = get_player_position()
-    local enemies = actors_manager.get_enemy_actors()
-    local enemies_in_aoe = 0
-    for _, enemy in ipairs(enemies) do
-        if enemy and enemy:is_enemy() then
-            local enemy_pos = enemy:get_position()
-            local distance = target_pos:dist_to(enemy_pos)
-            if distance <= spell_data.blizzard.data.radius then -- Blizzard AoE radius
-                enemies_in_aoe = enemies_in_aoe + 1
-            end
-        end
-    end
+    local enemies_in_aoe = my_utility.enemy_count_in_range(target_pos, spell_data.blizzard.data.radius)
     if enemies_in_aoe < menu_elements.min_enemies:get() then
         return false;
     end

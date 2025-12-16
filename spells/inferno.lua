@@ -33,8 +33,8 @@ local function logics(target)
         return false;
     end;
 
-    local area_data = target_selector.get_most_hits_target_circular_area_heavy(get_player_position(), spell_data.inferno.data.radius, spell_data.inferno.data.radius)
-    local amount_hits = area_data.n_hits
+    local player_position = get_player_position();
+    local amount_hits = my_utility.enemy_count_in_range(player_position, spell_data.inferno.data.radius);
 
     if amount_hits < menu_elements.min_max_targets:get() then
         return false;

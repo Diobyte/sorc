@@ -29,7 +29,8 @@ local function logics(target)
     if not is_logic_allowed then return false end;
 
     -- Check for minimum enemies in range
-    local enemies_in_range = my_utility.enemy_count_in_range(spell_data.unstable_current.data.radius); -- Unstable Current range
+    local player_position = get_player_position();
+    local enemies_in_range = my_utility.enemy_count_in_range(player_position, spell_data.unstable_current.data.radius); -- Unstable Current range
     if enemies_in_range < menu_elements.min_enemies:get() then
         return false;
     end
